@@ -293,7 +293,6 @@ function parseLine(l) {
 }
 
 function calcVectors(xyz) {
-    //return xyz.map(p => new THREE.Vector3(p[0], p[1], p[2]));
     let vectors = [];
     for(let i = 0; i < xyz.length; i++) {
         vectors.push(new THREE.Vector3(xyz[i][0], xyz[i][1], xyz[i][2]));
@@ -301,20 +300,20 @@ function calcVectors(xyz) {
     return vectors;
 }
 
-const DEFAULT_SIZE = 3;
+const DEFAULT_SIZE = 1.5;
 const DEFAULT_HEIGHT = 1;
 const DEFAULT_ALPHA = 0.1;
 
 const sizes = {
-    505: 8,
-    506: 6,
-    507: 4.5,
+    505: 6,
+    506: 3.5,
+    507: 2,
 }
 
 const heights = {
     505: 30,
     506: 15,
-    507: 7.5,
+    507: 5,
 }
 
 const alphas = {
@@ -333,18 +332,29 @@ const colors = {
 
 function renderPoint(d) {
     const c = d[1];
+    const p = d[3];
+
+    let x = d[7];
+    let y = d[8];
+    
+    // mirror during 2nd period
+    // easy to do cause around 0,0,0
+    if(p == 2) {
+        x = -x;
+        y = -y;
+    }
 
     // if code in table then take the value else default
     const size = sizes.hasOwnProperty(c) ? sizes[c] : DEFAULT_SIZE;
-    const height = heights.hasOwnProperty(c) ? heights[c] : DEFAULT_HEIGHT;
+    const z = heights.hasOwnProperty(c) ? heights[c] : DEFAULT_HEIGHT;
     const alpha = alphas.hasOwnProperty(c) ? alphas[c] : DEFAULT_ALPHA;
-
+    
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', 
         new THREE.Float32BufferAttribute([
-            d[7],   // x
-            d[8],   // y
-            height  // z
+            x,
+            y,
+            z,
         ], 3));
 
     const color = colors[parseInt(d[10])]
@@ -367,13 +377,10 @@ function renderEvents(data) {
     });
 }
 
-
 // render the river and animate it
 function renderGame() {
     let data = parseCSV();
     renderEvents(data);
-    //console.log(data);
-    //let terrain = renderTerrain(points);
     renderRink();
 }
 
@@ -382,18 +389,20 @@ function renderRink() {
     // NHL rink dimensions
     const geometry = new THREE.PlaneGeometry(200, 85); 
     
-    // ice ice material with realistic properties
+    // ice material with realistic properties
     const material = new THREE.MeshPhysicalMaterial({
-        color: 0xf2f8fc,         // slight blue-white tint
-        metalness: 0.2,          // low metalness for more icy look
-        roughness: 0.1,          // smooth surface, ice
-        transmission: 0.7,
-        thickness: 0.7,          // material thickness for transmission
-        clearcoat: 1.0,          // add clearcoat for extra shine
-        clearcoatRoughness: 0.1, // smooth clearcoat
+        color: 0xf2f8fc,            // slight blue-white tint
+        metalness: 0.0,             // low metalness for more icy look
+        roughness: 0.05,            // smooth surface, ice
+        transmission: 0.9,
+        thickness: 0.1,             // material thickness for transmission
+        // clearcoat worse when on
+        //clearcoat: 0.0,           // add clearcoat for extra shine
+        //clearcoatRoughness: 0.0,  // smooth clearcoat
         transparent: true,
-        opacity: 0.95,
-        side: THREE.DoubleSide
+        //opacity: 0.95,
+        side: THREE.DoubleSide,
+        //side: THREE.FrontSide,
     });
 
     const rink = new THREE.Mesh(geometry, material);
@@ -440,7 +449,7 @@ function renderRink() {
 // render visual helpers
 function renderTools() {
     const size = 1000;
-    const divisions = 10;
+    const divisions = 40;
     const gridHelper = new THREE.GridHelper( size, divisions );
     gridHelper.rotation.x = Math.PI / 2;
     scene.add( gridHelper );
@@ -468,7 +477,7 @@ const far = 10000;
 const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
 // set cam default
 //x, y, z
-camera.position.set(0, -50, 100);
+camera.position.set(0, -75, 75);
 //camera.position.set(50, -200, 75);
 camera.lookAt(0, 0, 0);
 camera.up.set(0, 0, 1);
