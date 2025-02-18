@@ -1,0 +1,9 @@
+[package]
+name = "htmlpacker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+maud = "*"
+tokio = { version = "1.28", features = ["full"] }
+reqwest = "0.11"
