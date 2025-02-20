@@ -9,257 +9,299 @@
 //y_coord,              8
 //player_id,            9
 //team_id,              10
-//additional_info,      11
-//highlight_clip_url    12
-
+//shot_type,            11
+//shot_miss_reason,     12
+//highlight_clip_url    13
 
 const csv = `
-158,502,faceoff,1,19:50,10,10,-69,-22,0,10,,
-449,507,missed-shot,1,19:48,12,12,-49,-13,8482055,23,wrist;wide-left,
-444,507,missed-shot,1,19:30,30,30,-77,-7,8480748,23,tip-in;wide-right,
-447,503,hit,1,19:19,41,41,-95,-23,8476853,10,,
-446,504,giveaway,1,18:59,61,61,-82,-25,8480078,23,,
-429,507,missed-shot,1,18:39,81,81,-50,39,8478444,23,wrist;wide-left,
-432,503,hit,1,18:25,95,95,-20,-27,8474574,23,,
-419,507,missed-shot,1,17:50,130,130,-78,8,8480459,23,tip-in;wide-right,
-420,503,hit,1,17:11,169,169,-32,-13,8478483,10,,
-412,509,penalty,1,16:56,184,184,-81,-36,0,10,,
-157,502,faceoff,1,16:56,184,184,-69,-22,0,10,,
-409,506,shot-on-goal,1,16:54,186,186,-81,8,8482496,23,snap,
-408,506,shot-on-goal,1,16:53,187,187,-45,3,8474574,23,slap,
-407,508,blocked-shot,1,16:39,201,201,-82,-5,8481535,23,blocked,
-398,506,shot-on-goal,1,16:12,228,228,-78,16,8479425,23,wrist,
-156,502,faceoff,1,15:48,252,252,-69,-22,0,10,,
-378,507,missed-shot,1,15:05,295,295,68,-2,8479318,10,wrist;wide-left,
-376,508,blocked-shot,1,14:58,302,302,60,-16,8475690,10,blocked,
-501,507,missed-shot,1,14:36,324,324,-83,-6,8478856,23,wrist;wide-left,
-380,504,giveaway,1,14:24,336,336,-37,26,8479425,23,,
-369,506,shot-on-goal,1,14:18,342,342,-70,-24,8478856,23,wrist,
-360,507,missed-shot,1,13:42,378,378,-78,-27,8480012,23,wrist;hit-crossbar,
-357,507,missed-shot,1,13:25,395,395,69,6,8474157,10,tip-in;wide-right,
-395,503,hit,1,13:23,397,397,96,4,8480144,10,,
-362,504,giveaway,1,13:07,413,413,21,-42,8477969,23,,
-390,503,hit,1,13:06,414,414,20,-40,8480144,10,,
-373,503,hit,1,12:51,429,429,-93,31,8476927,23,,
-342,508,blocked-shot,1,12:31,449,449,-76,-2,8475762,23,blocked,
-361,503,hit,1,11:43,497,497,85,-37,8483678,23,,
-334,503,hit,1,11:05,535,535,-6,39,8481122,10,,
-313,508,blocked-shot,1,10:30,570,570,82,4,8476931,10,blocked,
-324,525,takeaway,1,10:21,579,579,84,40,8477939,10,,
-322,503,hit,1,10:08,592,592,-94,-20,8480748,23,,
-155,502,faceoff,1,10:00,600,600,-69,-22,0,23,,
-305,507,missed-shot,1,09:58,602,602,-46,-30,8483678,23,slap;high-and-wide-left,
-295,506,shot-on-goal,1,09:26,634,634,52,18,8479318,10,slap,
-312,504,giveaway,1,09:23,637,637,62,42,8475171,10,,
-311,525,takeaway,1,09:14,646,646,-96,26,8482720,10,,
-290,506,shot-on-goal,1,09:00,660,660,-40,13,8476927,23,wrist,
-289,507,missed-shot,1,08:53,667,667,62,21,8482720,10,wrist;high-and-wide-right,
-307,504,giveaway,1,08:47,673,673,-88,-33,8479026,10,,
-310,503,hit,1,08:33,687,687,-58,41,8480078,23,,
-279,508,blocked-shot,1,08:21,699,699,-42,-14,8483678,23,blocked,
-291,503,hit,1,07:43,737,737,29,-38,8475171,10,,
-266,506,shot-on-goal,1,07:28,752,752,82,5,8477939,10,wrist,
-280,503,hit,1,07:04,776,776,-95,-9,8478057,23,,
-259,505,goal,1,07:00,780,780,-80,10,8479425,23,snap,https://nhl.com/video/tor-van-hronek-scores-goal-against-joseph-woll-6368531808112
-56,502,faceoff,1,07:00,780,780,0,0,0,23,,
-264,525,takeaway,1,06:54,786,786,-89,-34,8480012,23,,
-258,506,shot-on-goal,1,06:49,791,791,-83,-8,8478498,23,wrist,
-257,506,shot-on-goal,1,06:48,792,792,-37,-27,8475762,23,wrist,
-249,508,blocked-shot,1,06:15,825,825,-86,3,8476927,23,teammate-blocked,
-262,503,hit,1,06:08,832,832,-76,-39,8474157,10,,
-248,506,shot-on-goal,1,06:05,835,835,-33,-23,8477969,23,slap,
-247,507,missed-shot,1,06:00,840,840,-47,-32,8477969,23,snap;wide-right,
-237,506,shot-on-goal,1,05:31,869,869,-76,13,8480078,23,wrist,
-245,504,giveaway,1,05:12,888,888,26,-40,8483678,23,,
-227,508,blocked-shot,1,04:56,904,904,-50,23,8479425,23,blocked,
-226,506,shot-on-goal,1,04:51,909,909,-59,14,8478057,23,wrist,
-236,504,giveaway,1,04:35,925,925,-18,25,8481122,10,,
-154,502,faceoff,1,04:19,941,941,-69,-22,0,10,,
-221,504,giveaway,1,03:55,965,965,-81,-16,8479318,10,,
-203,507,missed-shot,1,03:25,995,995,-59,30,8480012,23,tip-in;wide-right,
-225,503,hit,1,03:22,998,998,-56,-40,8479026,10,,
-222,503,hit,1,03:09,1011,1011,62,40,8480748,23,,
-147,506,shot-on-goal,1,03:06,1014,1014,45,-41,8479026,10,wrist,
-220,503,hit,1,03:06,1014,1014,50,-37,8479425,23,,
-210,504,giveaway,1,02:59,1021,1021,-29,37,8476927,23,,
-209,503,hit,1,02:14,1066,1066,-9,32,8480995,10,,
-134,506,shot-on-goal,1,02:08,1072,1072,61,-28,8482259,10,wrist,
-131,506,shot-on-goal,1,02:01,1079,1079,69,30,8481582,10,wrist,
-130,507,missed-shot,1,02:00,1080,1080,80,-19,8480995,10,backhand;wide-left,
-54,502,faceoff,1,01:42,1098,1098,0,0,0,23,,
-153,502,faceoff,1,01:26,1114,1114,-69,22,0,10,,
-119,508,blocked-shot,1,01:23,1117,1117,-78,26,8478856,23,blocked,
-129,504,giveaway,1,01:19,1121,1121,-98,-1,8478057,23,,
-128,503,hit,1,00:47,1153,1153,94,29,8477369,23,,
-124,504,giveaway,1,00:46,1154,1154,87,7,8477967,23,,
-108,506,shot-on-goal,1,00:36,1164,1164,27,-13,8475171,10,wrist,
-53,502,faceoff,1,00:27,1173,1173,69,22,0,10,,
-121,503,hit,1,00:19,1181,1181,98,2,8474157,10,,
-107,504,giveaway,1,00:14,1186,1186,32,-8,8483678,23,,
-109,503,hit,1,00:06,1194,1194,-32,-39,8483678,23,,
-51,502,faceoff,1,00:00,1200,1200,0,0,0,23,,
-797,505,goal,2,19:54,6,1206,-66,22,8476853,10,wrist,https://nhl.com/video/tor-van-rielly-scores-goal-against-kevin-lankinen-6368536115112
-63,502,faceoff,2,19:54,6,1206,0,0,0,10,,
-795,507,missed-shot,2,19:50,10,1210,-59,-11,8479318,10,slap;wide-left,
-169,502,faceoff,2,19:37,23,1223,-69,-22,0,10,,
-790,506,shot-on-goal,2,19:35,25,1225,-47,-15,8477503,10,wrist,
-783,508,blocked-shot,2,18:44,76,1276,-72,-20,8477939,10,blocked,
-781,506,shot-on-goal,2,18:30,90,1290,-78,-17,8475166,10,wrist,
-778,509,penalty,2,17:50,130,1330,90,32,0,23,,
-168,502,faceoff,2,17:50,130,1330,-69,-22,0,10,,
-768,506,shot-on-goal,2,17:17,163,1363,83,14,8478856,23,wrist,
-505,507,missed-shot,2,17:06,174,1374,85,3,8480459,23,backhand;wide-left,
-766,506,shot-on-goal,2,17:04,176,1376,90,-16,8478856,23,backhand,
-765,506,shot-on-goal,2,17:01,179,1379,29,-29,8474574,23,wrist,
-767,503,hit,2,16:35,205,1405,-32,-41,8479425,23,,
-756,503,hit,2,15:54,246,1446,83,-37,8480748,23,,
-35,507,missed-shot,2,15:52,248,1448,77,13,8480748,23,wrist;wide-right,
-746,507,missed-shot,2,15:43,257,1457,-53,12,8479026,10,wrist;wide-right,
-732,506,shot-on-goal,2,14:59,301,1501,-49,4,8474157,10,wrist,
-731,506,shot-on-goal,2,14:38,322,1522,-35,-7,8476931,10,wrist,
-728,506,shot-on-goal,2,14:31,329,1529,-44,2,8475171,10,wrist,
-742,503,hit,2,14:25,335,1535,80,-39,8478057,23,,
-721,506,shot-on-goal,2,14:11,349,1549,-68,-37,8476853,10,wrist,
-712,506,shot-on-goal,2,13:31,389,1589,-42,-31,8481582,10,slap,
-723,503,hit,2,13:09,411,1611,-97,-20,8477939,10,,
-707,507,missed-shot,2,13:05,415,1615,-29,4,8477939,10,wrist;above-crossbar,
-62,502,faceoff,2,12:59,421,1621,69,22,0,23,,
-167,502,faceoff,2,12:23,457,1657,-69,-22,0,10,,
-699,507,missed-shot,2,12:14,466,1666,-34,-8,8475171,10,wrist;wide-right,
-697,508,blocked-shot,2,12:06,474,1674,-69,1,8475171,10,teammate-blocked,
-166,502,faceoff,2,12:02,478,1678,-69,22,0,10,,
-693,508,blocked-shot,2,11:57,483,1683,-65,-29,8482720,10,blocked,
-165,502,faceoff,2,11:41,499,1699,-69,-22,0,23,,
-504,507,missed-shot,2,11:38,502,1702,-64,-2,8478483,10,deflected;high-and-wide-right,
-695,504,giveaway,2,11:21,519,1719,-30,-39,8478483,10,,
-692,503,hit,2,11:06,534,1734,-71,40,8478057,23,,
-164,502,faceoff,2,11:00,540,1740,-69,-22,0,10,,
-680,507,missed-shot,2,10:58,542,1742,-77,1,8478904,10,tip-in;wide-left,
-686,503,hit,2,10:46,554,1754,5,-41,8478904,10,,
-684,503,hit,2,10:42,558,1758,-95,-26,8474157,10,,
-675,507,missed-shot,2,10:29,571,1771,-86,-15,8476853,10,wrist;wide-left,
-674,507,missed-shot,2,10:27,573,1773,-70,11,8474157,10,tip-in;wide-right,
-664,506,shot-on-goal,2,09:47,613,1813,-42,-39,8480995,10,wrist,
-672,503,hit,2,09:40,620,1820,78,39,8480078,23,,
-661,508,blocked-shot,2,09:34,626,1826,83,-3,8477369,23,blocked,
-662,504,giveaway,2,08:53,667,1867,36,37,8475762,23,,
-503,508,blocked-shot,2,08:20,700,1900,-61,-1,8479318,10,blocked,
-649,506,shot-on-goal,2,08:14,706,1906,-63,12,8479318,10,wrist,
-652,503,hit,2,07:56,724,1924,96,2,8480748,23,,
-640,507,missed-shot,2,07:53,727,1927,53,28,8474574,23,wrist;hit-crossbar,
-638,507,missed-shot,2,07:46,734,1934,76,26,8474574,23,wrist;hit-right-post,
-637,506,shot-on-goal,2,07:10,770,1970,50,-19,8480748,23,wrist,
-639,525,takeaway,2,07:04,776,1976,-35,39,8480012,23,,
-636,508,blocked-shot,2,06:56,784,1984,-39,15,8475171,10,blocked,
-163,502,faceoff,2,06:53,787,1987,-69,-22,0,10,,
-631,506,shot-on-goal,2,06:51,789,1989,-45,-38,8474157,10,wrist,
-634,503,hit,2,06:44,796,1996,97,24,8478057,23,,
-162,502,faceoff,2,06:20,820,2020,-69,-22,0,23,,
-627,504,giveaway,2,06:11,829,2029,-24,42,8477369,23,,
-612,503,hit,2,03:58,962,2162,-33,-40,8477939,10,,
-601,506,shot-on-goal,2,03:46,974,2174,45,41,8475762,23,wrist,
-61,502,faceoff,2,03:44,976,2176,69,22,0,23,,
-497,507,missed-shot,2,03:41,979,2179,48,18,8475762,23,slap;wide-right,
-499,503,hit,2,03:19,1001,2201,-92,32,8482720,10,,
-161,502,faceoff,2,03:17,1003,2203,-69,22,0,23,,
-502,506,shot-on-goal,2,03:13,1007,2207,-33,6,8482720,10,backhand,
-490,507,missed-shot,2,02:43,1037,2237,-36,-1,8480144,10,backhand;wide-left,
-484,506,shot-on-goal,2,02:25,1055,2255,-37,-25,8476931,10,wrist,
-473,508,blocked-shot,2,01:33,1107,2307,72,1,8478444,23,blocked,
-485,503,hit,2,01:33,1107,2307,85,-20,8481122,10,,
-160,502,faceoff,2,01:15,1125,2325,-69,-22,0,10,,
-475,504,giveaway,2,01:02,1138,2338,97,10,8476853,10,,
-159,502,faceoff,2,00:50,1150,2350,-69,-22,0,23,,
-465,506,shot-on-goal,2,00:48,1152,2352,-65,-26,8478483,10,slap,
-60,502,faceoff,2,00:36,1164,2364,69,22,0,10,,
-459,506,shot-on-goal,2,00:34,1166,2366,47,26,8480748,23,wrist,
-463,503,hit,2,00:11,1189,2389,-7,-39,8480748,23,,
-59,502,faceoff,2,00:06,1194,2394,0,0,0,10,,
-57,502,faceoff,2,00:00,1200,2400,0,0,0,23,,
-1161,504,giveaway,3,19:56,4,2404,68,-41,8480748,23,,
-1159,508,blocked-shot,3,19:56,4,2404,34,-33,8478483,10,blocked,
-1151,507,missed-shot,3,19:04,56,2456,-87,6,8477969,23,wrist;hit-right-post,
-511,507,missed-shot,3,18:59,61,2461,66,-8,8476927,23,wrist;wide-right,
-1098,506,shot-on-goal,3,18:44,76,2476,77,9,8475166,10,wrist,
-1096,508,blocked-shot,3,18:33,87,2487,85,-6,8475166,10,blocked,
-1095,506,shot-on-goal,3,18:22,98,2498,57,-27,8479318,10,slap,
-1158,504,giveaway,3,18:17,103,2503,93,-24,8475762,23,,
-1156,525,takeaway,3,18:15,105,2505,66,-33,8474574,23,,
-74,502,faceoff,3,18:03,117,2517,69,-22,0,10,,
-1089,506,shot-on-goal,3,18:01,119,2519,76,-18,8479318,10,wrist,
-1084,509,penalty,3,16:58,182,2582,62,-13,0,23,,
-72,502,faceoff,3,16:58,182,2582,69,22,0,10,,
-1080,508,blocked-shot,3,16:56,184,2584,69,-14,8476853,10,blocked,
-1079,507,missed-shot,3,16:54,186,2586,81,4,8482720,10,tip-in;wide-right,
-1075,508,blocked-shot,3,16:20,220,2620,61,-22,8479318,10,blocked,
-179,502,faceoff,3,16:03,237,2637,-69,-22,0,23,,
-510,507,missed-shot,3,16:01,239,2639,-87,-4,8480459,23,wrist;short,
-509,506,shot-on-goal,3,16:00,240,2640,-87,-6,8480459,23,bat,
-1074,525,takeaway,3,15:56,244,2644,-97,-22,8478856,23,,
-71,502,faceoff,3,15:40,260,2660,20,-22,0,10,,
-1055,507,missed-shot,3,14:38,322,2722,-65,-12,8478498,23,wrist;wide-right,
-178,502,faceoff,3,13:58,362,2762,-69,22,0,23,,
-508,507,missed-shot,3,13:52,368,2768,-82,7,8482055,23,backhand;wide-left,
-1041,508,blocked-shot,3,13:50,370,2770,-79,-1,8476927,23,blocked,
-1043,525,takeaway,3,13:17,403,2803,58,41,8474157,10,,
-1046,503,hit,3,13:13,407,2807,98,-18,8477369,23,,
-1025,506,shot-on-goal,3,12:54,426,2826,67,-30,8477939,10,wrist,
-1038,503,hit,3,12:43,437,2837,-92,30,8476931,10,,
-1018,507,missed-shot,3,12:27,453,2853,79,2,8482259,10,tip-in;wide-right,
-1007,507,missed-shot,3,11:41,499,2899,-30,35,8474574,23,slap;wide-right,
-556,508,blocked-shot,3,10:12,588,2988,-43,15,8481535,23,blocked,
-177,502,faceoff,3,10:10,590,2990,-20,22,0,10,,
-981,508,blocked-shot,3,09:39,621,3021,87,-11,8482259,10,blocked,
-994,503,hit,3,09:22,638,3038,-8,-40,8482259,10,,
-70,502,faceoff,3,09:12,648,3048,69,22,0,10,,
-980,504,giveaway,3,09:00,660,3060,13,38,8474157,10,,
-973,505,goal,3,08:56,664,3064,-66,-1,8478444,23,wrist,https://nhl.com/video/tor-van-boeser-scores-goal-against-joseph-woll-6368535757112
-69,502,faceoff,3,08:56,664,3064,0,0,0,10,,
-972,507,missed-shot,3,08:43,677,3077,-38,29,8479425,23,slap;wide-right,
-971,507,missed-shot,3,08:32,688,3088,-88,4,8478057,23,deflected;wide-right,
-968,506,shot-on-goal,3,08:12,708,3108,-94,8,8476931,10,wrist,
-176,502,faceoff,3,08:08,712,3112,-69,-22,0,10,,
-966,506,shot-on-goal,3,08:05,715,3115,-85,-6,8480078,23,poke,
-962,509,penalty,3,07:43,737,3137,-90,-27,0,10,,
-175,502,faceoff,3,07:43,737,3137,-69,-22,0,10,,
-68,502,faceoff,3,07:21,759,3159,0,0,0,10,,
-507,507,missed-shot,3,07:01,779,3179,-60,-2,8480078,23,wrist;short,
-900,508,blocked-shot,3,06:59,781,3181,-60,17,8480078,23,blocked,
-895,507,missed-shot,3,06:38,802,3202,-35,-34,8475762,23,slap;high-and-wide-right,
-957,525,takeaway,3,06:19,821,3221,0,-11,8480748,23,,
-887,506,shot-on-goal,3,06:08,832,3232,-1,12,8480012,23,wrist,
-67,502,faceoff,3,05:47,853,3253,69,22,0,10,,
-878,506,shot-on-goal,3,05:44,856,3256,69,18,8482259,10,snap,
-965,503,hit,3,04:53,907,3307,-98,0,8476927,23,,
-867,506,shot-on-goal,3,04:39,921,3321,-83,-13,8476927,23,wrist,
-866,507,missed-shot,3,04:37,923,3323,-32,-15,8483678,23,wrist;hit-left-post,
-173,502,faceoff,3,04:34,926,3326,-69,-22,0,23,,
-862,507,missed-shot,3,04:33,927,3327,-34,-34,8483678,23,wrist;wide-right,
-861,508,blocked-shot,3,04:28,932,3332,-60,26,8481535,23,blocked,
-882,504,giveaway,3,04:20,940,3340,-18,-29,8477939,10,,
-855,507,missed-shot,3,04:12,948,3348,-76,-19,8480078,23,wrist;wide-left,
-48,506,shot-on-goal,3,03:42,978,3378,-83,1,8482055,23,tip-in,
-865,504,giveaway,3,03:41,979,3379,-95,29,8475690,10,,
-172,502,faceoff,3,03:24,996,3396,-20,22,0,23,,
-842,508,blocked-shot,3,03:15,1005,3405,80,8,8475171,10,blocked,
-840,508,blocked-shot,3,03:04,1016,3416,38,33,8475171,10,blocked,
-848,504,giveaway,3,03:00,1020,3420,61,42,8480144,10,,
-839,508,blocked-shot,3,02:56,1024,3424,47,27,8475171,10,blocked,
-835,506,shot-on-goal,3,02:38,1042,3442,-73,-31,8478856,23,wrist,
-871,503,hit,3,02:28,1052,3452,-48,-39,8480995,10,,
-830,504,giveaway,3,01:54,1086,3486,80,-31,8480995,10,,
-171,502,faceoff,3,01:19,1121,3521,-69,-22,0,10,,
-818,506,shot-on-goal,3,01:18,1122,3522,-61,1,8480078,23,wrist,
-823,525,takeaway,3,01:16,1124,3524,-99,-6,8482055,23,,
-849,503,hit,3,01:14,1126,3526,-98,2,8478444,23,,
-841,503,hit,3,01:00,1140,3540,-89,33,8478444,23,,
-820,504,giveaway,3,00:50,1150,3550,5,40,8477969,23,,
-809,508,blocked-shot,3,00:27,1173,3573,66,18,8476931,10,blocked,
-807,506,shot-on-goal,3,00:17,1183,3583,-68,-21,8475690,10,wrist,
-66,502,faceoff,3,00:08,1192,3592,69,-22,0,23,,
-804,506,shot-on-goal,3,00:06,1194,3594,59,-38,8478483,10,wrist,
-64,502,faceoff,3,00:00,1200,3600,0,0,0,23,,
+101,502,faceoff,1,20:00,0,0,0,0,0,66,,,
+103,502,faceoff,1,19:55,5,5,-20,22,0,60,,,
+167,504,giveaway,1,19:37,23,23,97,25,8476463,66,,,
+168,503,hit,1,19:37,23,23,96,20,8477492,60,,,
+164,509,penalty,1,19:16,44,44,57,36,0,66,,,
+105,502,faceoff,1,19:16,44,44,69,22,0,66,,,
+169,505,goal,1,19:04,56,56,78,19,8477492,60,wrist,,https://nhl.com/video/can-swe-mackinnon-scores-ppg-against-filip-gustavsson-6368733412112
+106,502,faceoff,1,19:04,56,56,0,0,0,60,,,
+301,507,missed-shot,1,18:50,70,70,79,2,8478402,60,tip-in,wide-left,
+175,508,blocked-shot,1,18:47,73,73,84,2,8478402,60,,blocked,
+176,508,blocked-shot,1,18:41,79,79,75,3,8477504,60,,blocked,
+177,506,shot-on-goal,1,18:34,86,86,66,25,8477933,60,wrist,,
+107,502,faceoff,1,18:32,88,88,69,22,0,60,,,
+181,508,blocked-shot,1,18:31,89,89,59,10,8478439,60,,blocked,
+184,525,takeaway,1,18:27,93,93,14,-31,8474563,60,,,
+223,503,hit,1,18:12,108,108,-96,-26,8477496,66,,,
+185,508,blocked-shot,1,17:58,122,122,-79,-6,8478042,66,,blocked,
+193,504,giveaway,1,17:52,128,128,-41,41,8476463,66,,,
+207,504,giveaway,1,17:26,154,154,99,-6,8479406,66,,,
+192,507,missed-shot,1,17:25,155,155,72,0,8478010,60,deflected,wide-left,
+195,506,shot-on-goal,1,17:05,175,175,85,25,8473419,60,snap,,
+267,503,hit,1,16:28,212,212,-34,-39,8476892,60,,,
+271,503,hit,1,16:14,226,226,-70,-39,8476483,66,,,
+109,507,missed-shot,1,15:51,249,249,77,-4,8478402,60,snap,wide-left,
+110,502,faceoff,1,15:23,277,277,69,22,0,60,,,
+219,508,blocked-shot,1,15:21,279,279,76,8,8478038,60,,blocked,
+221,508,blocked-shot,1,15:04,296,296,74,6,8478038,60,,blocked,
+222,507,missed-shot,1,14:59,301,301,37,-24,8480069,60,snap,wide-right,
+236,525,takeaway,1,14:34,326,326,-66,33,8476887,66,,,
+242,504,giveaway,1,14:29,331,331,-12,13,8476887,66,,,
+234,508,blocked-shot,1,13:56,364,364,-78,6,8476887,66,,blocked,
+251,504,giveaway,1,13:47,373,373,-44,-40,8482093,60,,,
+111,507,missed-shot,1,13:05,415,415,-3,18,8477939,66,wrist,wide-right,
+263,504,giveaway,1,12:52,428,428,84,29,8477492,60,,,
+265,504,giveaway,1,12:44,436,436,71,40,8478493,66,,,
+266,504,giveaway,1,12:39,441,441,80,-34,8480069,60,,,
+268,525,takeaway,1,12:18,462,462,28,13,8480012,66,,,
+112,502,faceoff,1,12:03,477,477,69,22,0,66,,,
+371,503,hit,1,12:00,480,480,98,24,8476463,66,,,
+277,504,giveaway,1,11:50,490,490,-68,37,8477504,60,,,
+283,525,takeaway,1,11:43,497,497,-40,41,8478483,60,,,
+113,502,faceoff,1,11:12,528,528,20,22,0,60,,,
+374,503,hit,1,10:46,554,554,-26,40,8475913,60,,,
+395,503,hit,1,10:31,569,569,-73,-25,8476887,66,,,
+416,503,hit,1,09:33,627,627,61,40,8477504,60,,,
+362,506,shot-on-goal,1,09:07,653,653,-57,-41,8476892,60,wrist,,
+114,502,faceoff,1,09:01,659,659,69,-22,0,66,,,
+368,504,giveaway,1,08:53,667,667,46,-21,8477933,60,,,
+366,506,shot-on-goal,1,08:34,686,686,66,-26,8480069,60,snap,,
+116,502,faceoff,1,08:32,688,688,69,-22,0,66,,,
+303,507,missed-shot,1,08:20,700,700,-37,7,8480839,66,wrist,short,
+384,508,blocked-shot,1,07:37,743,743,78,-17,8474563,60,,blocked,
+393,506,shot-on-goal,1,07:07,773,773,78,-4,8478519,60,tip-in,,
+117,502,faceoff,1,07:04,776,776,69,-22,0,60,,,
+397,507,missed-shot,1,07:02,778,778,79,-33,8473419,60,backhand,wide-right,
+398,505,goal,1,06:45,795,795,75,7,8473419,60,snap,,https://nhl.com/video/can-swe-marchand-scores-goal-against-filip-gustavsson-6368734035112
+118,502,faceoff,1,06:45,795,795,0,0,0,60,,,
+437,503,hit,1,06:40,800,800,18,40,8480839,66,,,
+119,502,faceoff,1,06:34,806,806,69,22,0,66,,,
+403,508,blocked-shot,1,06:22,818,818,64,11,8475913,60,,blocked,
+405,507,missed-shot,1,06:11,829,829,-82,-23,8477939,66,backhand,wide-left,
+120,502,faceoff,1,05:39,861,861,-20,22,0,60,,,
+420,507,missed-shot,1,04:47,913,913,-60,-30,8478055,66,snap,wide-right,
+121,502,faceoff,1,04:45,915,915,-69,-22,0,60,,,
+436,504,giveaway,1,04:36,924,924,-59,-38,8477939,66,,,
+302,508,blocked-shot,1,04:29,931,931,-80,1,8474578,66,,blocked,
+438,508,blocked-shot,1,03:26,994,994,72,-8,8480069,60,,blocked,
+490,503,hit,1,03:06,1014,1014,18,40,8478493,66,,,
+448,507,missed-shot,1,02:51,1029,1029,-39,-1,8475167,66,slap,wide-left,
+449,506,shot-on-goal,1,02:44,1036,1036,-30,-31,8478055,66,snap,,
+122,502,faceoff,1,02:42,1038,1038,-69,-22,0,66,,,
+453,507,missed-shot,1,02:13,1067,1067,73,11,8477933,60,tip-in,wide-right,
+470,504,giveaway,1,01:30,1110,1110,-2,24,8480069,60,,,
+469,506,shot-on-goal,1,00:44,1156,1156,-16,31,8477496,66,tip-in,,
+478,506,shot-on-goal,1,00:20,1180,1180,-37,-27,8482078,66,snap,,
+123,502,faceoff,1,00:18,1182,1182,-69,-22,0,66,,,
+651,508,blocked-shot,1,00:06,1194,1194,-53,36,8478493,66,,blocked,
+489,503,hit,1,00:06,1194,1194,-57,40,8477492,60,,,
+486,507,missed-shot,1,00:03,1197,1197,-78,37,8479407,66,wrist,wide-right,
+124,502,faceoff,2,20:00,0,1200,0,0,0,60,,,
+555,503,hit,2,19:25,35,1235,98,-9,8476483,66,,,
+557,525,takeaway,2,19:12,48,1248,-35,-18,8476459,66,,,
+500,506,shot-on-goal,2,18:59,61,1261,-60,-21,8478402,60,snap,,
+126,502,faceoff,2,18:57,63,1263,-69,-22,0,66,,,
+573,503,hit,2,18:53,67,1267,-81,40,8478439,60,,,
+580,503,hit,2,18:43,77,1277,98,8,8474679,66,,,
+571,504,giveaway,2,18:42,78,1278,94,13,8476892,60,,,
+589,503,hit,2,18:41,79,1279,30,-39,8478519,60,,,
+592,503,hit,2,18:37,83,1283,92,-19,8477496,66,,,
+595,503,hit,2,18:30,90,1290,-90,-36,8478439,60,,,
+598,503,hit,2,18:27,93,1293,-53,40,8479542,60,,,
+701,503,hit,2,18:26,94,1294,-16,40,8478519,60,,,
+705,503,hit,2,18:18,102,1302,97,-19,8477960,66,,,
+564,506,shot-on-goal,2,18:15,105,1305,63,-27,8477960,66,tip-in,,
+565,507,missed-shot,2,18:13,107,1307,74,20,8477960,66,wrist,wide-left,
+567,507,missed-shot,2,18:08,112,1312,67,-1,8477960,66,tip-in,wide-right,
+127,502,faceoff,2,17:57,123,1323,-69,22,0,60,,,
+572,507,missed-shot,2,17:50,130,1330,-28,1,8474563,60,slap,above-crossbar,
+908,503,hit,2,17:37,143,1343,-55,-40,8477960,66,,,
+718,503,hit,2,17:27,153,1353,-86,-34,8473419,60,,,
+128,502,faceoff,2,16:26,214,1414,20,22,0,60,,,
+597,504,giveaway,2,16:23,217,1417,52,35,8476892,60,,,
+593,506,shot-on-goal,2,16:18,222,1422,74,7,8477939,66,backhand,,
+304,507,missed-shot,2,16:17,223,1423,92,8,8477939,66,snap,failed-bank-attempt,
+129,502,faceoff,2,16:05,235,1435,20,22,0,60,,,
+703,504,giveaway,2,15:56,244,1444,-45,24,8476483,66,,,
+599,506,shot-on-goal,2,15:46,254,1454,-69,-18,8477933,60,snap,,
+130,502,faceoff,2,15:37,263,1463,-69,22,0,60,,,
+704,507,missed-shot,2,15:34,266,1466,-45,37,8478038,60,snap,wide-left,
+711,506,shot-on-goal,2,15:07,293,1493,-77,-29,8477492,60,snap,,
+730,503,hit,2,15:00,300,1500,-58,40,8475913,60,,,
+131,502,faceoff,2,14:56,304,1504,20,-22,0,60,,,
+715,506,shot-on-goal,2,14:42,318,1518,74,10,8482078,66,backhand,,
+133,502,faceoff,2,14:39,321,1521,69,22,0,60,,,
+134,502,faceoff,2,14:33,327,1527,69,-22,0,66,,,
+722,508,blocked-shot,2,14:16,344,1544,-77,4,8474563,60,,blocked,
+135,502,faceoff,2,13:48,372,1572,-20,-22,0,60,,,
+741,504,giveaway,2,13:16,404,1604,-77,-29,8478402,60,,,
+743,504,giveaway,2,13:14,406,1606,-19,30,8482078,66,,,
+739,506,shot-on-goal,2,12:50,430,1630,-65,15,8475913,60,snap,,
+136,502,faceoff,2,12:29,451,1651,69,22,0,66,,,
+745,506,shot-on-goal,2,12:25,455,1655,49,35,8476887,66,slap,,
+137,502,faceoff,2,12:23,457,1657,69,22,0,60,,,
+751,508,blocked-shot,2,11:51,489,1689,59,3,8476887,66,,blocked,
+757,506,shot-on-goal,2,11:31,509,1709,4,-32,8480012,66,wrist,,
+138,502,faceoff,2,11:27,513,1713,69,-22,0,66,,,
+769,503,hit,2,11:11,529,1729,-98,-14,8479542,60,,,
+139,502,faceoff,2,10:54,546,1746,-69,22,0,66,,,
+770,508,blocked-shot,2,10:49,551,1751,-47,-26,8478038,60,,blocked,
+775,505,goal,2,10:27,573,1773,64,-34,8476463,66,snap,,https://nhl.com/video/can-swe-brodin-scores-goal-against-jordan-binnington-6368734978112
+140,502,faceoff,2,10:27,573,1773,0,0,0,66,,,
+141,502,faceoff,2,10:07,593,1793,69,-22,0,66,,,
+781,508,blocked-shot,2,09:58,602,1802,73,-2,8477939,66,,blocked,
+782,506,shot-on-goal,2,09:54,606,1806,76,-2,8476483,66,tip-in,,
+144,502,faceoff,2,09:51,609,1809,69,-22,0,60,,,
+786,508,blocked-shot,2,09:30,630,1830,81,3,8476483,66,,blocked,
+787,508,blocked-shot,2,09:23,637,1837,41,-35,8474578,66,,blocked,
+788,508,blocked-shot,2,09:15,645,1845,72,-16,8477939,66,,blocked,
+789,508,blocked-shot,2,09:05,655,1855,55,-17,8474578,66,,blocked,
+809,503,hit,2,08:29,691,1891,-78,-39,8482093,60,,,
+808,504,giveaway,2,08:17,703,1903,43,21,8478042,66,,,
+814,503,hit,2,08:14,706,1906,14,-39,8478042,66,,,
+819,503,hit,2,07:59,721,1921,-92,-32,8478439,60,,,
+821,503,hit,2,07:46,734,1934,-97,26,8479542,60,,,
+810,508,blocked-shot,2,07:40,740,1940,-57,-11,8480069,60,,blocked,
+145,502,faceoff,2,07:34,746,1946,0,0,0,60,,,
+815,506,shot-on-goal,2,07:09,771,1971,-74,9,8475913,60,backhand,,
+305,508,blocked-shot,2,07:07,773,1973,-88,2,8471675,60,,blocked,
+146,502,faceoff,2,07:04,776,1976,-69,-22,0,60,,,
+822,506,shot-on-goal,2,06:50,790,1990,-30,22,8476892,60,slap,,
+147,502,faceoff,2,06:48,792,1992,-69,22,0,60,,,
+826,508,blocked-shot,2,06:36,804,2004,62,15,8475167,66,,blocked,
+827,507,missed-shot,2,06:31,809,2009,-56,-14,8471675,60,wrist,hit-crossbar,
+306,507,missed-shot,2,05:52,848,2048,92,-28,8480012,66,backhand,wide-right,
+847,503,hit,2,05:42,858,2058,95,-23,8477960,66,,,
+848,504,giveaway,2,05:39,861,2061,77,-41,8477960,66,,,
+850,525,takeaway,2,05:36,864,2064,35,-39,8476887,66,,,
+839,507,missed-shot,2,05:23,877,2077,49,19,8477960,66,slap,high-and-wide-left,
+846,508,blocked-shot,2,04:56,904,2104,66,26,8478042,66,,blocked,
+849,507,missed-shot,2,04:48,912,2112,66,21,8478042,66,slap,wide-left,
+860,504,giveaway,2,04:24,936,2136,93,-30,8478038,60,,,
+875,525,takeaway,2,03:39,981,2181,50,-42,8480069,60,,,
+909,503,hit,2,03:35,985,2185,67,-40,8478493,66,,,
+867,506,shot-on-goal,2,03:19,1001,2201,48,-21,8482078,66,snap,,
+869,507,missed-shot,2,03:14,1006,2206,41,-11,8475218,66,slap,above-crossbar,
+879,505,goal,2,02:32,1048,2248,-63,8,8475913,60,snap,,https://nhl.com/video/can-swe-stone-scores-goal-against-filip-gustavsson-6368736695112
+148,502,faceoff,2,02:32,1048,2248,0,0,0,60,,,
+885,508,blocked-shot,2,01:50,1090,2290,66,-3,8474578,66,,blocked,
+149,508,blocked-shot,2,01:40,1100,2300,75,-8,8475218,66,,blocked,
+889,506,shot-on-goal,2,01:30,1110,2310,76,-1,8476887,66,deflected,,
+150,502,faceoff,2,01:26,1114,2314,69,22,0,66,,,
+951,508,blocked-shot,2,01:23,1117,2317,62,27,8477939,66,,blocked,
+893,504,giveaway,2,01:21,1119,2319,85,25,8476887,66,,,
+900,504,giveaway,2,00:45,1155,2355,-94,-13,8477504,60,,,
+501,502,faceoff,2,00:01,1199,2399,69,22,0,66,,,
+502,508,blocked-shot,2,00:01,1199,2399,71,20,8478493,66,,blocked,
+503,502,faceoff,3,20:00,0,2400,0,0,0,66,,,
+505,502,faceoff,3,19:49,11,2411,-69,22,0,66,,,
+913,507,missed-shot,3,19:46,14,2414,-68,11,8477939,66,tip-in,wide-right,
+916,507,missed-shot,3,19:26,34,2434,-33,-42,8475167,66,snap,wide-left,
+927,504,giveaway,3,19:08,52,2452,99,-17,8480839,66,,,
+925,506,shot-on-goal,3,19:05,55,2455,30,-30,8476892,60,slap,,
+506,502,faceoff,3,19:03,57,2457,69,-22,0,60,,,
+928,507,missed-shot,3,18:47,73,2473,78,12,8478483,60,deflected,wide-right,
+940,503,hit,3,18:37,83,2483,18,40,8477933,60,,,
+937,505,goal,3,18:06,114,2514,-50,2,8477960,66,snap,,https://nhl.com/video/can-swe-kempe-scores-goal-against-jordan-binnington-6368739343112
+507,502,faceoff,3,18:06,114,2514,0,0,0,60,,,
+941,507,missed-shot,3,17:46,134,2534,-75,37,8476887,66,snap,wide-right,
+508,502,faceoff,3,16:24,216,2616,-20,-22,0,60,,,
+1011,508,blocked-shot,3,16:07,233,2633,-67,9,8480839,66,,blocked,
+1021,503,hit,3,16:04,236,2636,-98,19,8476483,66,,,
+1022,504,giveaway,3,15:55,245,2645,53,-15,8478055,66,,,
+1033,503,hit,3,15:43,257,2657,87,-33,8479542,60,,,
+1036,525,takeaway,3,15:15,285,2685,85,35,8479542,60,,,
+1023,506,shot-on-goal,3,15:11,289,2689,32,-41,8474563,60,snap,,
+1038,504,giveaway,3,15:06,294,2694,99,-1,8478439,60,,,
+1044,525,takeaway,3,14:44,316,2716,64,-36,8473419,60,,,
+509,502,faceoff,3,14:36,324,2724,0,0,0,60,,,
+1048,503,hit,3,14:34,326,2726,13,-40,8476887,66,,,
+1060,504,giveaway,3,14:30,330,2730,90,35,8476463,66,,,
+1061,504,giveaway,3,14:27,333,2733,81,16,8475167,66,,,
+1056,503,hit,3,14:14,346,2746,-97,-1,8477960,66,,,
+1046,506,shot-on-goal,3,13:40,380,2780,-79,0,8478042,66,tip-in,,
+1063,504,giveaway,3,13:32,388,2788,65,-24,8480839,66,,,
+1064,504,giveaway,3,13:30,390,2790,41,-32,8480069,60,,,
+1050,508,blocked-shot,3,13:26,394,2794,-54,31,8477496,66,,blocked,
+510,502,faceoff,3,13:01,419,2819,69,22,0,66,,,
+1066,508,blocked-shot,3,12:39,441,2841,56,-35,8474563,60,,blocked,
+511,502,faceoff,3,12:37,443,2843,69,-22,0,60,,,
+1070,506,shot-on-goal,3,12:35,445,2845,31,-14,8478038,60,snap,,
+512,502,faceoff,3,12:33,447,2847,69,-22,0,66,,,
+1086,503,hit,3,11:46,494,2894,9,34,8479542,60,,,
+513,506,shot-on-goal,3,11:42,498,2898,-82,29,8477960,66,backhand,,
+1083,508,blocked-shot,3,11:22,518,2918,-82,19,8474578,66,,blocked,
+514,502,faceoff,3,11:07,533,2933,-69,-22,0,66,,,
+1087,505,goal,3,11:01,539,2939,-85,7,8478493,66,wrist,,https://nhl.com/video/can-swe-eriksson-ek-scores-goal-against-jordan-binnington-6368737891112
+515,502,faceoff,3,11:01,539,2939,0,0,0,66,,,
+1093,503,hit,3,10:56,544,2944,97,7,8482093,60,,,
+516,502,faceoff,3,10:50,550,2950,-20,-22,0,60,,,
+517,502,faceoff,3,10:19,581,2981,-69,22,0,66,,,
+1103,508,blocked-shot,3,10:16,584,2984,-51,-23,8478055,66,,blocked,
+518,502,faceoff,3,10:14,586,2986,-69,-22,0,60,,,
+1108,506,shot-on-goal,3,09:45,615,3015,-58,-24,8477939,66,snap,,
+1112,506,shot-on-goal,3,09:31,629,3029,69,14,8478038,60,snap,,
+522,502,faceoff,3,09:30,630,3030,69,22,0,60,,,
+1129,525,takeaway,3,09:20,640,3040,53,-42,8480069,60,,,
+1134,504,giveaway,3,09:18,642,3042,31,-40,8480069,60,,,
+1118,506,shot-on-goal,3,08:54,666,3066,76,8,8478038,60,snap,,
+1204,504,giveaway,3,08:31,689,3089,13,41,8477492,60,,,
+1128,508,blocked-shot,3,08:22,698,3098,-62,-34,8475167,66,,blocked,
+524,502,faceoff,3,08:04,716,3116,-20,22,0,60,,,
+1205,503,hit,3,07:30,750,3150,-98,-14,8480012,66,,,
+1142,508,blocked-shot,3,07:21,759,3159,78,-3,8480069,60,,blocked,
+1144,507,missed-shot,3,07:20,760,3160,88,-11,8473419,60,backhand,wide-right,
+1150,509,penalty,3,07:06,774,3174,-60,-39,0,60,,,
+525,502,faceoff,3,07:06,774,3174,-69,-22,0,66,,,
+1208,508,blocked-shot,3,06:40,800,3200,-56,3,8475167,66,,blocked,
+526,502,faceoff,3,06:38,802,3202,-69,22,0,66,,,
+1223,504,giveaway,3,06:30,810,3210,-69,42,8478038,60,,,
+1218,506,shot-on-goal,3,05:59,841,3241,-76,21,8474578,66,wrist,,
+1219,507,missed-shot,3,05:50,850,3250,55,16,8480069,60,snap,above-crossbar,
+1231,504,giveaway,3,05:38,862,3262,-15,-21,8476887,66,,,
+1234,506,shot-on-goal,3,04:58,902,3302,-69,-32,8477960,66,snap,,
+1237,508,blocked-shot,3,04:37,923,3323,-68,24,8477496,66,,blocked,
+527,502,faceoff,3,04:35,925,3325,-69,22,0,60,,,
+528,502,faceoff,3,04:28,932,3332,-69,22,0,60,,,
+1242,506,shot-on-goal,3,04:22,938,3338,-28,-35,8476483,66,wrist,,
+529,502,faceoff,3,04:15,945,3345,-69,-22,0,60,,,
+530,502,faceoff,3,03:49,971,3371,69,22,0,60,,,
+1263,525,takeaway,3,03:37,983,3383,-94,-29,8475913,60,,,
+1271,504,giveaway,3,03:23,997,3397,69,42,8482078,66,,,
+1270,503,hit,3,03:22,998,3398,45,41,8478493,66,,,
+1274,525,takeaway,3,02:55,1025,3425,89,33,8478038,60,,,
+1279,504,giveaway,3,02:43,1037,3437,-24,42,8478010,60,,,
+1273,508,blocked-shot,3,02:24,1056,3456,54,19,8477504,60,,blocked,
+1281,503,hit,3,02:10,1070,3470,98,-23,8476463,66,,,
+1275,506,shot-on-goal,3,02:04,1076,3476,85,9,8477933,60,snap,,
+531,502,faceoff,3,02:02,1078,3478,69,22,0,66,,,
+1296,503,hit,3,01:29,1111,3511,35,-40,8478055,66,,,
+1289,506,shot-on-goal,3,01:04,1136,3536,-70,36,8475167,66,snap,,
+1290,506,shot-on-goal,3,00:56,1144,3544,-45,-40,8480839,66,snap,,
+1300,508,blocked-shot,3,00:35,1165,3565,82,-5,8476892,60,,teammate-blocked,
+1309,504,giveaway,3,00:18,1182,3582,60,31,8477492,60,,,
+532,502,faceoff,4,10:00,600,4200,0,0,0,66,,,
+1321,506,shot-on-goal,4,08:36,684,4284,-72,10,8477492,60,snap,,
+534,502,faceoff,4,08:34,686,4286,-69,22,0,66,,,
+1326,506,shot-on-goal,4,08:05,715,4315,67,17,8476459,66,wrist,,
+535,502,faceoff,4,08:03,717,4317,69,22,0,60,,,
+1330,506,shot-on-goal,4,07:47,733,4333,-69,-14,8477492,60,wrist,,
+536,502,faceoff,4,07:46,734,4334,-69,-22,0,60,,,
+1333,506,shot-on-goal,4,07:25,755,4355,-62,-3,8477492,60,snap,,
+1340,504,giveaway,4,07:20,760,4360,-76,18,8476887,66,,,
+1335,506,shot-on-goal,4,07:13,767,4367,-58,-3,8480069,60,snap,,
+1339,506,shot-on-goal,4,06:57,783,4383,-66,-15,8479542,60,wrist,,
+1345,506,shot-on-goal,4,06:16,824,4424,-68,13,8478483,60,snap,,
+307,507,missed-shot,4,06:14,826,4426,-79,8,8478010,60,snap,wide-left,
+537,502,faceoff,4,06:12,828,4428,-69,22,0,60,,,
+308,506,shot-on-goal,4,05:35,865,4465,-84,0,8476459,66,deflected,,
+652,506,shot-on-goal,4,05:34,866,4466,83,-1,8476483,66,backhand,,
+1349,506,shot-on-goal,4,05:26,874,4474,-65,-11,8477492,60,snap,,
+1401,507,missed-shot,4,05:18,882,4482,56,-30,8476459,66,slap,above-crossbar,
+538,508,blocked-shot,4,05:10,890,4490,69,-2,8477960,66,,blocked,
+653,507,missed-shot,4,05:00,900,4500,58,-23,8480012,66,slap,wide-right,
+1406,508,blocked-shot,4,04:56,904,4504,61,6,8478055,66,,blocked,
+1407,506,shot-on-goal,4,04:50,910,4510,83,0,8477960,66,tip-in,,
+1417,505,goal,4,03:54,966,4566,-56,8,8478483,60,snap,,https://nhl.com/video/can-swe-marner-scores-goal-against-filip-gustavsson-6368740170112
 `;
+
 
 // parse data from csv string
 function parseCSV() {
@@ -324,10 +366,12 @@ const alphas = {
 
 // hash table for team id: hex colors
 const colors = {
-    10: 0x082057,
+    //10: 0x082057,
     //23: 0x0a1b2b
     //23: 0xf5e4d4,
-    23: 0xff1111,
+    //23: 0xff1111,
+    66: 0xfed000,
+    60: 0xff1111,
 }
 
 function renderPoint(d) {
@@ -339,7 +383,7 @@ function renderPoint(d) {
     
     // mirror during 2nd period
     // easy to do cause around 0,0,0
-    if(p == 2) {
+    if((p % 2) == 0) {
         x = -x;
         y = -y;
     }
@@ -379,13 +423,22 @@ function renderEvents(data) {
 
 // render the river and animate it
 function renderGame() {
+    console.log("test1");
     let data = parseCSV();
     renderEvents(data);
+    console.log("test2");
     renderRink();
 }
 
-// position ranges from -100 to 100 meters on the x-axis and -42.5 to 42.5 meters on the y-axis 
 function renderRink() {
+    renderIce();
+    renderLines();
+    renderNets();
+    renderLights();
+}
+
+// position ranges from -100 to 100 meters on the x-axis and -42.5 to 42.5 meters on the y-axis 
+function renderIce() {
     // NHL rink dimensions
     const geometry = new THREE.PlaneGeometry(200, 85); 
     
@@ -408,6 +461,279 @@ function renderRink() {
     const rink = new THREE.Mesh(geometry, material);
     rink.position.set(0, 0, 0);
     
+    scene.add(rink);
+    
+    // subtle fog for depth
+    //scene.fog = new THREE.Fog(0x878787, 100, 700);
+}
+
+
+function renderLines() {
+    const geometry = new THREE.PlaneGeometry(1, 85); 
+    const material = new THREE.MeshPhysicalMaterial({
+        color: 0xff0000,
+        metalness: 0.0,
+        roughness: 0.05,
+        transmission: 0.9,
+        thickness: 0.1,
+        transparent: true,
+        opacity: 0.6,
+        side: THREE.FrontSide,
+    });
+    const centerLine = new THREE.Mesh(geometry, material);
+    centerLine.position.set(0, 0, 0.05);
+    scene.add(centerLine);
+
+    renderOffsides();
+    renderGoalLines();
+    renderFaceoffCircles();
+}
+
+function renderGoalLines() {
+    const geometry = new THREE.PlaneGeometry(0.5, 85); 
+    const material = new THREE.MeshPhysicalMaterial({
+        color: 0xff0000,
+        metalness: 0.0,
+        roughness: 0.05,
+        transmission: 0.9,
+        thickness: 0.1,
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.FrontSide,
+    });
+
+    const leftGoalLine = new THREE.Mesh(geometry, material);
+    leftGoalLine.position.set(-89, 0, 0.05);
+    
+    const rightGoalLine = new THREE.Mesh(geometry, material);
+    rightGoalLine.position.set(89, 0, 0.05);
+    
+    scene.add(leftGoalLine);
+    scene.add(rightGoalLine);
+}
+
+function renderOffsides() {
+    const geometry = new THREE.PlaneGeometry(1.5, 85); 
+    const material = new THREE.MeshPhysicalMaterial({
+        color: 0x0000ff,
+        metalness: 0.0,
+        roughness: 0.05,
+        transmission: 0.9,
+        thickness: 0.1,
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.FrontSide,
+    });
+
+    const left_offside_line = new THREE.Mesh(geometry, material);
+    left_offside_line.position.set(-26.5, 0, 0.05);
+    
+    const right_offside_line = new THREE.Mesh(geometry, material);
+    right_offside_line.position.set(26.5, 0, 0.05);
+    
+    scene.add(left_offside_line);
+    scene.add(right_offside_line);
+}
+
+function renderNets() {
+    const netL = createHockeyNet();
+    netL.rotation.z = Math.PI / 2;
+    netL.rotation.y = Math.PI / 2;
+    netL.position.set(-89, 0, 0);
+    const netR = createHockeyNet();
+    netR.rotation.z = -Math.PI / 2;
+    netR.rotation.y = -Math.PI / 2;
+    netR.position.set(89, 0, 0);
+    
+    scene.add(netL);
+    scene.add(netR);
+}
+
+// hockey Net dimensions in feet
+const NET_WIDTH = 6;
+const NET_HEIGHT = 4;
+const NET_DEPTH = 2.5;
+const PIPE_RADIUS = 0.1;
+
+function createHockeyNet() {
+    const netGroup = new THREE.Group();
+    
+    const pipeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff0000,
+      metalness: 0.8,
+      //roughness: 0.2
+    });
+
+    // pipe geometry
+    function createPipe(start, end) {
+        const direction = new THREE.Vector3().subVectors(end, start);
+        const length = direction.length();
+        
+        const geometry = new THREE.CylinderGeometry(
+          PIPE_RADIUS, 
+          PIPE_RADIUS, 
+          length,
+          8  // n segments
+        );
+        
+        const pipe = new THREE.Mesh(geometry, pipeMaterial);
+        
+        // position and rotate the pipe according to start and end positions
+        pipe.position.copy(start);
+        pipe.position.add(direction.multiplyScalar(0.5));
+        pipe.lookAt(end);
+        pipe.rotateX(Math.PI / 2);
+        
+        return pipe;
+    }
+
+    // create the frame pipes positions
+    const corners = {
+        bottomLeft: new THREE.Vector3(-NET_WIDTH/2, 0, 0),
+        bottomRight: new THREE.Vector3(NET_WIDTH/2, 0, 0),
+        topLeft: new THREE.Vector3(-NET_WIDTH/2, NET_HEIGHT, 0),
+        topRight: new THREE.Vector3(NET_WIDTH/2, NET_HEIGHT, 0),
+        bottomBackLeft: new THREE.Vector3(-NET_WIDTH/2, 0, -NET_DEPTH),
+        bottomBackRight: new THREE.Vector3(NET_WIDTH/2, 0, -NET_DEPTH),
+        topBackLeft: new THREE.Vector3(-NET_WIDTH/2, NET_HEIGHT, -NET_DEPTH),
+        topBackRight: new THREE.Vector3(NET_WIDTH/2, NET_HEIGHT, -NET_DEPTH)
+    };
+
+    // front frame
+    netGroup.add(createPipe(corners.bottomLeft, corners.topLeft));
+    netGroup.add(createPipe(corners.bottomRight, corners.topRight));
+    netGroup.add(createPipe(corners.topLeft, corners.topRight));
+    
+    // back frame
+    netGroup.add(createPipe(corners.bottomBackLeft, corners.bottomBackRight));
+    netGroup.add(createPipe(corners.bottomBackLeft, corners.topBackLeft));
+    netGroup.add(createPipe(corners.bottomBackRight, corners.topBackRight));
+    netGroup.add(createPipe(corners.topBackLeft, corners.topBackRight));
+    
+    // connecting pipes
+    netGroup.add(createPipe(corners.bottomLeft, corners.bottomBackLeft));
+    netGroup.add(createPipe(corners.bottomRight, corners.bottomBackRight));
+    netGroup.add(createPipe(corners.topLeft, corners.topBackLeft));
+    netGroup.add(createPipe(corners.topRight, corners.topBackRight));
+    
+    // support pipes at back to indicate so
+    const centerBottom = new THREE.Vector3(0, 0, -NET_DEPTH);
+    const centerTop = new THREE.Vector3(0, NET_HEIGHT, -NET_DEPTH);
+    netGroup.add(createPipe(centerBottom, centerTop));
+
+    return netGroup;
+}
+
+const endZoneFaceoffPositions = [
+    { x: -69, y: -22 },
+    { x: -69, y: 22 },
+    { x: 69, y: -22 },
+    { x: 69, y: 22 }
+];
+
+const neutralZoneFaceoffPositions = [
+    { x: -20, y: -22 },
+    { x: -20, y: 22 },
+    { x: 20, y: -22 },
+    { x: 20, y: 22 }
+]
+
+function renderFaceoffCircles() {
+    renderCenterFaceoffCircle();
+    // puck drop
+    const radius = 1;
+    const segments = 64;
+    const circleGeometry = new THREE.CircleGeometry(radius, segments);
+    const circleMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xff0000,
+        metalness: 0.0,
+        roughness: 0.05,
+        transmission: 0.9,
+        thickness: 0.1,
+        transparent: true,
+        opacity: 0.95,
+        side: THREE.FrontSide,
+    });
+    const outlineMaterial = new THREE.LineBasicMaterial({ 
+        color: 0xff0000,
+        linewidth: 1,
+    });
+    // loop through end zone faceoff pos
+    endZoneFaceoffPositions.forEach(pos => {
+        // puck drop
+        const circle = new THREE.Mesh(circleGeometry, circleMaterial);
+        circle.position.set(pos.x, pos.y, 0.06);
+        scene.add(circle);
+        // outline
+        const curve = new THREE.EllipseCurve(
+            pos.x, pos.y,
+            15, 15,
+            0, 2 * Math.PI,
+            false,
+            0
+        );
+        const points = curve.getPoints(500);
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const outline = new THREE.Line(geometry, outlineMaterial);
+        scene.add(outline);
+    });
+
+    // loop through neutral zone faceoff pos
+    neutralZoneFaceoffPositions.forEach(pos => {
+        // puck drop
+        const circle = new THREE.Mesh(circleGeometry, circleMaterial);
+        circle.position.set(pos.x, pos.y, 0.06);
+        scene.add(circle);
+    });
+}
+
+function renderCenterFaceoffCircle() {
+    // puck drop
+    const radius = 1;
+    const segments = 64;
+    const centerCircleGeometry = new THREE.CircleGeometry(radius, segments);
+    const centerCircleMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0x0000ff,
+        metalness: 0.0,
+        roughness: 0.05,
+        transmission: 0.9,
+        thickness: 0.1,
+        transparent: true,
+        opacity: 0.95,
+        side: THREE.FrontSide,
+    });
+    const centerCircle = new THREE.Mesh(
+        centerCircleGeometry, 
+        centerCircleMaterial
+    );
+    centerCircle.position.set(0, 0, 0.06);
+    scene.add(centerCircle);
+
+    // outline
+    // Create a curve that forms a circle
+    const curve = new THREE.EllipseCurve(
+        0, 0,            // Center x, y
+        15, 15,         // X radius, Y radius
+        0, 2 * Math.PI,  // Start angle, end angle
+        false,           // Clockwise
+        0               // Rotation
+    );
+    
+    // Create points along the curve
+    const points = curve.getPoints(500);
+    
+    // Convert points to a geometry
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    
+    // Create a line material
+    const material = new THREE.LineBasicMaterial({ color: 0x0000ff });
+    
+    // Create the final circle
+    const circle = new THREE.Line(geometry, material);
+    scene.add(circle);
+}
+
+function renderLights() {
     // overhead lights
     const mainLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
     mainLight1.position.set(0, 100, 100);
@@ -437,13 +763,6 @@ function renderRink() {
     // subtle hemisphere light for better color blending
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb4d4ff, 0.3);
     scene.add(hemiLight);
-    
-    scene.add(rink);
-    
-    // subtle fog for depth
-    //scene.fog = new THREE.Fog(0x878787, 100, 700);
-    
-    return rink;
 }
 
 // render visual helpers

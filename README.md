@@ -12,19 +12,22 @@
 - pull out the key value pairs that you want
 
 **csv data points**:
-- event_id,
-- type_code,
-- event_type,
-- period,
-- time_period_mmss,
-- time_period_seconds,
-- time_game_seconds,
-- x_coord,
-- y_coord,
-- player_id,
-- team_id,
-- additional_info,
-- highlight_clip_url
+```
+event_id,             0
+type_code,            1
+event_type,           2
+period,               3
+time_period_mmss,     4
+time_period_seconds,  5
+time_game_seconds,    6
+x_coord,              7
+y_coord,              8
+player_id,            9
+team_id,              10
+shot_type,            11
+shot_miss_reason,     12
+highlight_clip_url    13
+```
 
 Ok we have our csv, so now what can we do with this?
 

@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use url::Url;
 use std::error::Error;
 // crates
 use serde::{Deserialize, Serialize};
@@ -31,8 +32,10 @@ struct Play {
     type_desc_key: String,
     #[serde(rename = "periodDescriptor")]
     period_descriptor: PeriodDescriptor,
+    #[serde(rename = "timeRemaining")]
+    time_remaining: String,
     #[serde(rename = "timeInPeriod")]
-    time_in_period: String,
+    Time_in_period: String,
     // a lot of info inside this!!!
     details: Option<PlayDetails>,
 }
@@ -79,14 +82,17 @@ struct EventData {
     y_coord: Option<i32>,
     player_id: Option<i32>,
     team_id: Option<i32>,
-    additional_info: String,
+    // split this into 2
+    //additional_info: String,
+    shot_type: Option<String>,
+    shot_miss_reason: Option<String>,
     highlight_clip_url: Option<String>,
 }
 
 impl EventData {
     fn to_csv_row(&self) -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             self.event_id,
             self.type_code,
             self.event_type,
@@ -98,7 +104,9 @@ impl EventData {
             self.y_coord.unwrap_or(0),
             self.player_id.unwrap_or(0),
             self.team_id.unwrap_or(0),
-            self.additional_info,
+            //self.additional_info,
+            self.shot_type.as_ref().unwrap_or(&String::new()),
+            self.shot_miss_reason.as_ref().unwrap_or(&String::new()),
             self.highlight_clip_url.as_ref().unwrap_or(&String::new()),
         )
     }
@@ -141,16 +149,16 @@ fn process_play(play: &Play) -> Option<EventData> {
         // process time string to simple second based integer values
         let (time_game_seconds, time_period_seconds) = calculate_time_values(
             play.period_descriptor.number,
-            &play.time_in_period
+            &play.time_remaining
         );
 
         // include additional_info from shot_type and reason
-        let additional_info = match (&details.shot_type, &details.reason) {
-            (Some(shot), Some(reason)) => format!("{};{}", shot, reason),
-            (Some(shot), None) => shot.clone(),
-            (None, Some(reason)) => reason.clone(),
-            (None, None) => String::new(),
-        };
+        //let additional_info = match (&details.shot_type, &details.reason) {
+        //    (Some(shot), Some(reason)) => format!("{};{}", shot, reason),
+        //    (Some(shot), None) => shot.clone(),
+        //    (None, Some(reason)) => reason.clone(),
+        //    (None, None) => String::new(),
+        //};
 
         // handle highlight clip URL for goals
         let highlight_clip_url = if play.type_code == 505 {
@@ -164,14 +172,16 @@ fn process_play(play: &Play) -> Option<EventData> {
             type_code: play.type_code,
             event_type: play.type_desc_key.clone(),
             period: play.period_descriptor.number,
-            time_period_mmss: play.time_in_period.clone(),
+            time_period_mmss: play.time_remaining.clone(),
             time_period_seconds: time_period_seconds,
             time_game_seconds: time_game_seconds,
             x_coord: details.x_coord,
             y_coord: details.y_coord,
             player_id: get_player_id_from_details(details),
             team_id: details.team_id,
-            additional_info,    
+            //additional_info,
+            shot_type: details.shot_type.clone(),
+            shot_miss_reason: details.reason.clone(),
             highlight_clip_url,
         })
     } else {
@@ -201,10 +211,18 @@ fn calculate_time_values(period: i32, time_str: &str) -> (i32, i32) {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let game_url = "https://api-web.nhle.com/v1/gamecenter/2024020884/play-by-play";
-    //fetch_as_text(game_url).await?;
+    let base_api = Url::parse("https://api-web.nhle.com/v1/gamecenter/")?;
+    //let game_id = "2024020884";
+    let game_id = "2024190001";
+    //let game_id = "2024020869";
+    let game_url = format!("{}/play-by-play", game_id);
+    let full_url = base_api.join(&game_url)?;
+
     // read the JSON file
-    let game_data: PlayByPlay = fetch_as_json(game_url).await?;
+    //fetch_as_text(full_url.as_str()).await?;
+    
+    println!("{:?}", full_url.as_str());
+    let game_data: PlayByPlay = fetch_as_json(full_url.as_str()).await?;
 
     // collect events in a vector list
     let mut events: Vec<EventData> = game_data.plays.iter()
@@ -219,8 +237,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let output_path = PathBuf::from(r"./game_events.csv");
     let mut output = File::create(&output_path)?;
    
-
-    //let raw_header = r#"event_id,type_code,event_type,period,time_period_mmss,time_period_seconds,time_game_seconds,x_coord,y_coord,player_id,team_id,additional_info,highlight_clip_url"#.trim();
     let raw_header = r#"
     event_id,
     type_code,
@@ -233,7 +249,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     y_coord,
     player_id,
     team_id,
-    additional_info,
+    shot_type,
+    shot_miss_reason,
     highlight_clip_url
     "#.trim().replace("\n", "").replace("    ", "");
 
@@ -247,5 +264,4 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Event data has been written to {:?}", &output_path);
     Ok(())
 }
-
 
