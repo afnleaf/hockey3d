@@ -37,6 +37,11 @@ For our first [visualization](https://stezup.dev/hokej) lets try a Three.js rend
 - we have a 3d viz, is there more data to grab from the play by play?
 - I would like to know what part of the next that shots go, where are saves and where are goals?
 
+## System Architecture
+- we want to be able to be a web server and an html packer at the same time
+- first lets get the game_data.csv packed up into the html all in one go
+
+
 
 ### API Routes
 - Config - https://api.nhle.com/stats/rest/en/config
