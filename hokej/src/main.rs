@@ -58,13 +58,21 @@ fn decode_js(js: &str) -> String {
 }
 
 // place a bunch of scripts
-fn scripts(script_texts: Vec<String>, script_local: String) -> Markup {
+fn scripts(
+    script_texts: Vec<String>,
+    script_local: String,
+    csv: String,
+) -> Markup {
     html! {
+
         // you can do for loops in here :o
         @for script in &script_texts {
             script {
                 (PreEscaped(decode_js(script)))
             }
+        }
+        script {
+            (PreEscaped(format!("const csv=`{}`;", csv)))
         }
         script {
             (PreEscaped(decode_js(&script_local)))
@@ -76,10 +84,15 @@ fn scripts(script_texts: Vec<String>, script_local: String) -> Markup {
 // body
 // scripts
 // combine into page
-fn page(css: String, script_texts: Vec<String>, script_local: String) -> Markup {
+fn page(
+    css: String,
+    script_texts: Vec<String>,
+    script_local: String,
+    csv: String,
+) -> Markup {
     html! {
         (head(css))
-        body { (scripts(script_texts, script_local)) }
+        body { (scripts(script_texts, script_local, csv)) }
     }
 }
 
@@ -147,6 +160,7 @@ async fn main() -> Result<(), Box<dyn Error>>{
     let game_url = format!("{}/play-by-play", game_id);
     let full_url = base_api.join(&game_url)?;
     
+    let csv_texts: Vec<String> = vec![];
     let csv_content = jsonparser::pbp_to_csv(&full_url.as_str()).await?;
     println!("{}", csv_content);
 
@@ -155,8 +169,8 @@ async fn main() -> Result<(), Box<dyn Error>>{
     ];
     // use minified versions without module attributes
     let script_urls = vec![
-        "https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js",
-        "https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/TrackballControls.min.js"
+        "https://cdn.jsdelivr.net/npm/three@0.172.2/build/three.min.js",
+        "https://cdn.jsdelivr.net/npm/three@0.172.2/examples/js/controls/TrackballControls.min.js"
     ];
 
     //println!("script_urls= {:?}", script_urls);
@@ -167,7 +181,7 @@ async fn main() -> Result<(), Box<dyn Error>>{
     //println!("{:?}", script_local);
 
     //let records = parse_csv();
-    let markup = page(css_text, script_texts, script_local);
+    let markup = page(css_text, script_texts, script_local, csv_content);
     let html = markup.into_string();
     //println!("{}", html);
     save_html(html)?;

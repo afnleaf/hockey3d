@@ -4,6 +4,43 @@ use serde::{Deserialize, Serialize};
 //use url::Url;
 //use reqwest;
 
+#[derive(Debug, Serialize, Deserialize)]
+struct GameData {
+    #[serde(rename = "awayTeam")]
+    away_team: TeamInfo,
+    #[serde(rename = "homeTeam")]
+    home_team: TeamInfo,
+    #[serde(rename = "plays")]
+    plays: Vec<Play>,
+}
+
+
+// teams info 
+#[derive(Debug, Serialize, Deserialize)]
+struct TeamInfo {
+    //home or away
+    //
+    #[serde(rename = "commonName")]
+    teamName: CommonName,
+    #[serde(rename = "id")]
+    id: i32,
+    #[serde(rename = "abbrev")]
+    code3: String,
+    #[serde(rename = "score")]
+    score: i32,
+    #[serde(rename = "sog")]
+    sog: i32,
+    #[serde(rename = "logo")]
+    logo: String,
+    #[serde(rename = "darkLogo")]
+    darkLogo: String,
+} 
+
+#[derive(Debug, Serialize, Deserialize)]
+struct CommonName {
+    //#[serde(rename = "default")]
+    default: String,
+}
 
 // a list of all the plays during the game
 // ordered from first to last by time and period
@@ -242,6 +279,22 @@ pub async fn pbp_to_csv(url: &str) -> Result<String, Box<dyn Error>> {
     }
 
     Ok(csv_content)
+}
+
+// should just take the same exact json as a string
+// then embed it directly?
+fn teams_info() {
+
+}
+
+fn game_info_to_csv(url: &str) {
+    
+
+    let game_data: some type? = fetch_as_json(url).await?;
+    let awayTeam
+    let homeTeam
+    let playbyplay = pbp_to_csv(game_data);
+
 }
 
 /*
