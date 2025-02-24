@@ -334,7 +334,9 @@ fn pbp_to_csv2(
     Ok(csv_content)
 }
 
-pub async fn process_pbp(url: &str) -> Result<(), Box<dyn Error>>{
+pub async fn process_pbp(
+    url: &str
+) -> Result<(String, String, String), Box<dyn Error>>{
     //let game_data: GameData = fetch_as_json(url).await?;
     let json_data: Value = fetch_as_json_value(url).await?;
     //println!("{:?}", json_data);
@@ -342,16 +344,18 @@ pub async fn process_pbp(url: &str) -> Result<(), Box<dyn Error>>{
     // clone so we don't ruin the data that we need to parse
     let away_team = json_data["awayTeam"].clone();
     let home_team = json_data["homeTeam"].clone();
-    println!("{:?}", home_team);
-    println!("{:?}", away_team);
+    //println!("{:?}", home_team);
+    //println!("{:?}", away_team);
     //println!("Home Team:\n{}", serde_json::to_string_pretty(&home_team)?);
     //println!("\nAway Team:\n{}", serde_json::to_string_pretty(&away_team)?);
     let csv: String = pbp_to_csv2(json_data).unwrap();
-    //println!("{:?}", away_team);
+    //println!("{:?}", csv);
 
-
-
-    Ok(())
+    Ok((
+        serde_json::to_string_pretty(&away_team)?, 
+        serde_json::to_string_pretty(&home_team)?, 
+        csv
+    ))
 }
 
 /*

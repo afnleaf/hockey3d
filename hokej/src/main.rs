@@ -62,6 +62,8 @@ fn scripts(
     script_texts: Vec<String>,
     script_local: String,
     csv: String,
+    away_team: String,
+    home_team: String,
 ) -> Markup {
     html! {
 
@@ -71,8 +73,14 @@ fn scripts(
                 (PreEscaped(decode_js(script)))
             }
         }
+        // play-by-play csv and team info
         script {
-            (PreEscaped(format!("const csv=`{}`;", csv)))
+            (PreEscaped(format!(
+                "const csv=`{}`;\nconst awayJSON=`{}`\n const homeJSON=`{}`\n", 
+                csv,
+                away_team,
+                home_team,
+            )))
         }
         script {
             (PreEscaped(decode_js(&script_local)))
@@ -89,10 +97,19 @@ fn page(
     script_texts: Vec<String>,
     script_local: String,
     csv: String,
+    away_team: String,
+    home_team: String,
 ) -> Markup {
     html! {
         (head(css))
-        body { (scripts(script_texts, script_local, csv)) }
+        body { (scripts(
+                    script_texts,
+                    script_local,
+                    csv,
+                    away_team,
+                    home_team,
+                )) 
+        }
     }
 }
 
@@ -164,15 +181,25 @@ async fn main() -> Result<(), Box<dyn Error>>{
     let csv_content = jsonparser::pbp_to_csv(&full_url.as_str()).await?;
     //println!("{}", csv_content);
 
-    jsonparser::process_pbp(&full_url.as_str()).await?;
+    let (
+        away_team, home_team, csv,
+    ) = jsonparser::process_pbp(&full_url.as_str()).await?;
+    
+    //println!("{:?}", home_team);
+    //println!("{:?}", away_team);
+    //println!("{:?}", csv);
 
     let css_urls = vec![
         "https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css"
     ];
     // use minified versions without module attributes
+    //let script_urls = vec![
+    //    "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.min.js",
+    //    "https://cdn.jsdelivr.net/npm/three@0.172.0/examples/js/controls/TrackballControls.min.js"
+    //];
     let script_urls = vec![
-        "https://cdn.jsdelivr.net/npm/three@0.172.2/build/three.min.js",
-        "https://cdn.jsdelivr.net/npm/three@0.172.2/examples/js/controls/TrackballControls.min.js"
+        "https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js",
+        "https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/TrackballControls.min.js"
     ];
 
     //println!("script_urls= {:?}", script_urls);
@@ -183,7 +210,14 @@ async fn main() -> Result<(), Box<dyn Error>>{
     //println!("{:?}", script_local);
 
     //let records = parse_csv();
-    let markup = page(css_text, script_texts, script_local, csv_content);
+    let markup = page(
+        css_text,
+        script_texts,
+        script_local,
+        csv_content,
+        away_team,
+        home_team,
+    );
     let html = markup.into_string();
     //println!("{}", html);
     save_html(html)?;
