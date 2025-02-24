@@ -1,6 +1,7 @@
 use std::error::Error;
 // crates
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 //use url::Url;
 //use reqwest;
 
@@ -10,6 +11,7 @@ struct GameData {
     away_team: TeamInfo,
     #[serde(rename = "homeTeam")]
     home_team: TeamInfo,
+    // ordered from first to last by time and period
     #[serde(rename = "plays")]
     plays: Vec<Play>,
 }
@@ -21,7 +23,7 @@ struct TeamInfo {
     //home or away
     //
     #[serde(rename = "commonName")]
-    teamName: CommonName,
+    team_name: CommonName,
     #[serde(rename = "id")]
     id: i32,
     #[serde(rename = "abbrev")]
@@ -33,7 +35,7 @@ struct TeamInfo {
     #[serde(rename = "logo")]
     logo: String,
     #[serde(rename = "darkLogo")]
-    darkLogo: String,
+    dark_logo: String,
 } 
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -43,7 +45,6 @@ struct CommonName {
 }
 
 // a list of all the plays during the game
-// ordered from first to last by time and period
 #[derive(Debug, Serialize, Deserialize)]
 struct PlayByPlay {
     plays: Vec<Play>,
@@ -166,6 +167,14 @@ where
     Ok(jason)
 }
 
+async fn fetch_as_json_value(
+    url: &str
+) -> Result<serde_json::Value, Box<dyn Error>> {
+    let response = reqwest::get(url).await?;
+    let jason: serde_json::Value = response.json().await?;
+    Ok(jason)
+}
+
 fn get_player_id_from_details(details: &PlayDetails) -> Option<i32> {
     details.shooting_player_id
         .or(details.scoring_player_id)
@@ -283,18 +292,66 @@ pub async fn pbp_to_csv(url: &str) -> Result<String, Box<dyn Error>> {
 
 // should just take the same exact json as a string
 // then embed it directly?
-fn teams_info() {
+//fn teams_info() {
 
+//}
+
+fn pbp_to_csv2(
+    json_data: Value,
+) -> Result<String, Box<dyn Error>> {
+    // play by play data
+    let game_data: PlayByPlay = serde_json::from_value(json_data)?;
+    let mut plays: Vec<EventData> = game_data.plays.iter()
+        .filter_map(process_play)
+        .collect();
+    plays.sort_by(|a, b| a.time_game_seconds.cmp(&b.time_game_seconds));
+    
+    let raw_header = r#"
+    event_id,
+    type_code,
+    event_type,
+    period,
+    time_period_mmss,
+    time_period_seconds,
+    time_game_seconds,
+    x_coord,
+    y_coord,
+    player_id,
+    team_id,
+    shot_type,
+    shot_miss_reason,
+    highlight_clip_url
+    "#.trim().replace("\n", "").replace("    ", "");
+
+    let mut csv_content = String::from(raw_header);
+    csv_content.push('\n');
+
+    for play in plays {
+        csv_content.push_str(&play.to_csv_row());
+        csv_content.push('\n');
+    }
+
+    Ok(csv_content)
 }
 
-fn game_info_to_csv(url: &str) {
-    
+pub async fn process_pbp(url: &str) -> Result<(), Box<dyn Error>>{
+    //let game_data: GameData = fetch_as_json(url).await?;
+    let json_data: Value = fetch_as_json_value(url).await?;
+    //println!("{:?}", json_data);
+   
+    // clone so we don't ruin the data that we need to parse
+    let away_team = json_data["awayTeam"].clone();
+    let home_team = json_data["homeTeam"].clone();
+    println!("{:?}", home_team);
+    println!("{:?}", away_team);
+    //println!("Home Team:\n{}", serde_json::to_string_pretty(&home_team)?);
+    //println!("\nAway Team:\n{}", serde_json::to_string_pretty(&away_team)?);
+    let csv: String = pbp_to_csv2(json_data).unwrap();
+    //println!("{:?}", away_team);
 
-    let game_data: some type? = fetch_as_json(url).await?;
-    let awayTeam
-    let homeTeam
-    let playbyplay = pbp_to_csv(game_data);
 
+
+    Ok(())
 }
 
 /*

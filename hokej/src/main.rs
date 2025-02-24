@@ -162,7 +162,9 @@ async fn main() -> Result<(), Box<dyn Error>>{
     
     let csv_texts: Vec<String> = vec![];
     let csv_content = jsonparser::pbp_to_csv(&full_url.as_str()).await?;
-    println!("{}", csv_content);
+    //println!("{}", csv_content);
+
+    jsonparser::process_pbp(&full_url.as_str()).await?;
 
     let css_urls = vec![
         "https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css"
