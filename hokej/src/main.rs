@@ -59,8 +59,8 @@ fn decode_js(js: &str) -> String {
 
 // place a bunch of scripts
 fn scripts(
-    script_texts: Vec<String>,
-    script_local: String,
+    external_scripts_text: Vec<String>,
+    local_scripts_text: Vec<String>,
     csv: String,
     away_team: String,
     home_team: String,
@@ -68,7 +68,8 @@ fn scripts(
     html! {
 
         // you can do for loops in here :o
-        @for script in &script_texts {
+        // external scripts
+        @for script in &external_scripts_text {
             script {
                 (PreEscaped(decode_js(script)))
             }
@@ -82,9 +83,15 @@ fn scripts(
                 home_team,
             )))
         }
-        script {
-            (PreEscaped(decode_js(&script_local)))
+        // local scripts
+        @for script in &local_scripts_text {
+            script {
+                (PreEscaped(decode_js(script)))
+            }
         }
+        //script {
+        //    (PreEscaped(decode_js(&script_local)))
+        //}
     }
 }
 
@@ -94,8 +101,8 @@ fn scripts(
 // combine into page
 fn page(
     css: String,
-    script_texts: Vec<String>,
-    script_local: String,
+    external_scripts_text: Vec<String>,
+    local_scripts_text: Vec<String>,
     csv: String,
     away_team: String,
     home_team: String,
@@ -103,8 +110,8 @@ fn page(
     html! {
         (head(css))
         body { (scripts(
-                    script_texts,
-                    script_local,
+                    external_scripts_text,
+                    local_scripts_text,
                     csv,
                     away_team,
                     home_team,
@@ -113,14 +120,6 @@ fn page(
     }
 }
 
-//let path = Path::new("../data/river-points.csv");
-fn get_local_script(path: &Path) -> Result<String, Box<dyn Error>>{
-    let mut file = File::open(path)?;
-    let mut text = String::new();
-    file.read_to_string(&mut text)?;
-    //println!("{:?}", text);
-    Ok(text)
-}
 
 
 // fetch text from external url
@@ -132,7 +131,7 @@ async fn fetch_as_text(url: &str) -> Result<String, Box<dyn Error>> {
 
 // go through each external script file
 // saving 
-async fn get_script_strings(
+async fn get_external_scripts_text(
     script_urls: Vec<&str>
 ) -> Result<Vec<String>, Box<dyn Error>> {
     let mut script_strings: Vec<String> = vec![];
@@ -141,6 +140,28 @@ async fn get_script_strings(
         script_strings.push(text);
     }
     Ok(script_strings) 
+}
+
+fn get_local_scripts_text(
+    script_path_literals: Vec<&str>
+) -> Result<Vec<String>, Box<dyn Error>> {
+    let mut script_strings: Vec<String> = vec![];
+    //let script_local = get_local_script(Path::new("../public/script.js"))?;
+    for path in script_path_literals {
+        script_strings.push(
+            get_local_script(Path::new(path)).unwrap()
+        )
+    }
+    Ok(script_strings)
+}
+
+//let path = Path::new("../data/river-points.csv");
+fn get_local_script(path: &Path) -> Result<String, Box<dyn Error>>{
+    let mut file = File::open(path)?;
+    let mut text = String::new();
+    file.read_to_string(&mut text)?;
+    //println!("{:?}", text);
+    Ok(text)
 }
 
 // append each external css file together
@@ -197,23 +218,38 @@ async fn main() -> Result<(), Box<dyn Error>>{
     //    "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.min.js",
     //    "https://cdn.jsdelivr.net/npm/three@0.172.0/examples/js/controls/TrackballControls.min.js"
     //];
-    let script_urls = vec![
+    let external_scripts_list = vec![
         "https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js",
         "https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/TrackballControls.min.js"
     ];
 
+    let local_scripts_list = vec![
+        "../public/arena.js",
+        "../public/script.js",
+        "../public/hud.js",
+    ];
+
     //println!("script_urls= {:?}", script_urls);
     let css_text = get_css_string(css_urls).await?;
-    let script_texts = get_script_strings(script_urls).await?;
-    let script_local = get_local_script(Path::new("../public/script.js"))?;
-    //println!("{:?}", script_texts);
-    //println!("{:?}", script_local);
 
+    //let script_texts = get_script_strings(script_urls).await?;
+    let external_scripts_text = get_external_scripts_text(
+                                    external_scripts_list).await?;
+    //let script_local = get_local_script(Path::new("../public/script.js"))?;
+    let local_scripts_text = get_local_scripts_text(local_scripts_list)?;
+    //println!("{:?}", external_scripts_text);
+    //println!("{:?}", local_scripts_text);
+
+    // one list of all the scripts?
+    // pre process csv and json objects with the format!
+    // before sending into page()
+    //let embed_scripts: Vec<String> = vec![];
     //let records = parse_csv();
+
     let markup = page(
         css_text,
-        script_texts,
-        script_local,
+        external_scripts_text,
+        local_scripts_text,
         csv_content,
         away_team,
         home_team,
