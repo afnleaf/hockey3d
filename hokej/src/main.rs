@@ -194,7 +194,9 @@ fn save_html(html: String) -> Result<(), Box<dyn Error>> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>>{
     let base_api = Url::parse("https://api-web.nhle.com/v1/gamecenter/")?;
-    let game_id = "2024190001";
+    //let game_id = "2024020884";
+    let game_id = "2024020869";
+    //let game_id = "2024190001"; // swe can
     let game_url = format!("{}/play-by-play", game_id);
     let full_url = base_api.join(&game_url)?;
     

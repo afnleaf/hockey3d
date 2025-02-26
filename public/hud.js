@@ -398,6 +398,8 @@ legend.innerHTML = `
     <li><span style="display: inline-block; width: 12px; height: 12px; background-color: #ff1111; border-radius: 50%; margin-right: 8px;"></span> Goal (large point)</li>
     <li><span style="display: inline-block; width: 10px; height: 10px; background-color: #ff1111; border-radius: 50%; margin-right: 8px; opacity: 0.8;"></span> Shot on Goal (medium point)</li>
     <li><span style="display: inline-block; width: 8px; height: 8px; background-color: #ff1111; border-radius: 50%; margin-right: 8px; opacity: 0.6;"></span> Missed Shot (small point)</li>
+    <li><span style="display: inline-block; width: 4px; height: 4px; background-color: #ff1111; border-radius: 50%; margin-right: 8px; opacity: 0.4;"></span> Other Event (tiny point)</li>
+  </ul>
   </ul>
 `;
 
