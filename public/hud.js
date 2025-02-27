@@ -5,15 +5,51 @@ const awayTeam = JSON.parse(awayJSON);
 const homeTeam = JSON.parse(homeJSON);
 
 // Team colors mapping from hexadecimal values in script.js
-const teamColors = {
-  66: '#fed000', // Sweden (yellow)
-  60: '#ff1111', // Canada (red)
-  // These colors should match the ones in the colors object in script.js
+//const teamColors = {
+//  66: '#fed000', // Sweden (yellow)
+//  60: '#ff1111', // Canada (red)
+//  // These colors should match the ones in the colors object in script.js
+//};
+//console.log(teamColors);
+//
+const teamColorsH = {
+    1: "#CC0000",
+    2: "#00468B",
+    3: "#154B94",
+    4: "#000000",
+    5: "#000000",
+    6: "#010101",
+    7: "#003087",
+    8: "#A6192E",
+    9: "#010101",
+    10: "#00205B",
+    12: "#FFFFFF",
+    13: "#041E42",
+    14: "#00205B",
+    15: "#041E42",
+    16: "#010101",
+    17: "#C8102E",
+    18: "#FFFFFF",
+    19: "#004986",
+    20: "#C8102E",
+    21: "#FFFFFF",
+    22: "#00205B",
+    23: "#00205B",
+    24: "#010101",
+    25: "#000000",
+    26: "#A2AAAD",
+    28: "#010101",
+    29: "#041E42",
+    30: "#0E4431",
+    52: "#041E42",
+    54: "#000000",
+    55: "#001425",
+    59: "#6CACE4",
 };
 
 // Get team colors or use defaults
-const awayTeamColor = teamColors[awayTeam.id] || '#cccccc';
-const homeTeamColor = teamColors[homeTeam.id] || '#cccccc';
+const awayTeamColor = teamColorsH[awayTeam.id] || '#ff0000';
+const homeTeamColor = teamColorsH[homeTeam.id] || '#00ff00';
 
 // Create main HUD container
 const hudContainer = document.createElement('div');
@@ -392,13 +428,24 @@ legend.style.cssText = `
   pointer-events: auto;
 `;
 
+//legend.innerHTML = `
+//  <h3 style="margin-top: 0;">Event Legend</h3>
+//  <ul style="padding-left: 20px; margin-bottom: 0;">
+//    <li><span style="display: inline-block; width: 12px; height: 12px; background-color: #ff1111; border-radius: 50%; margin-right: 8px;"></span> Goal (large point)</li>
+//    <li><span style="display: inline-block; width: 10px; height: 10px; background-color: #ff1111; border-radius: 50%; margin-right: 8px; opacity: 0.8;"></span> Shot on Goal (medium point)</li>
+//    <li><span style="display: inline-block; width: 8px; height: 8px; background-color: #ff1111; border-radius: 50%; margin-right: 8px; opacity: 0.6;"></span> Missed Shot (small point)</li>
+//    <li><span style="display: inline-block; width: 4px; height: 4px; background-color: #ff1111; border-radius: 50%; margin-right: 8px; opacity: 0.4;"></span> Other Event (tiny point)</li>
+//  </ul>
+//  </ul>
+//`;
+
 legend.innerHTML = `
   <h3 style="margin-top: 0;">Event Legend</h3>
   <ul style="padding-left: 20px; margin-bottom: 0;">
-    <li><span style="display: inline-block; width: 12px; height: 12px; background-color: #ff1111; border-radius: 50%; margin-right: 8px;"></span> Goal (large point)</li>
-    <li><span style="display: inline-block; width: 10px; height: 10px; background-color: #ff1111; border-radius: 50%; margin-right: 8px; opacity: 0.8;"></span> Shot on Goal (medium point)</li>
-    <li><span style="display: inline-block; width: 8px; height: 8px; background-color: #ff1111; border-radius: 50%; margin-right: 8px; opacity: 0.6;"></span> Missed Shot (small point)</li>
-    <li><span style="display: inline-block; width: 4px; height: 4px; background-color: #ff1111; border-radius: 50%; margin-right: 8px; opacity: 0.4;"></span> Other Event (tiny point)</li>
+    <li><span style="display: inline-block; width: 12px; height: 12px; background-color: ${homeTeamColor}; border-radius: 50%; margin-right: 8px;"></span> Goal (large point)</li>
+    <li><span style="display: inline-block; width: 10px; height: 10px; background-color: ${homeTeamColor}; border-radius: 50%; margin-right: 8px; opacity: 0.8;"></span> Shot on Goal (medium point)</li>
+    <li><span style="display: inline-block; width: 8px; height: 8px; background-color: ${homeTeamColor}; border-radius: 50%; margin-right: 8px; opacity: 0.6;"></span> Missed Shot (small point)</li>
+    <li><span style="display: inline-block; width: 4px; height: 4px; background-color: ${homeTeamColor}; border-radius: 50%; margin-right: 8px; opacity: 0.4;"></span> Other Event (tiny point)</li>
   </ul>
   </ul>
 `;

@@ -75,14 +75,49 @@ const alphas = {
 }
 
 // hash table for team id: hex colors
-const colors = {
-    //10: 0x082057,
-    //23: 0x0a1b2b
-    //23: 0xf5e4d4,
-    //23: 0xff1111,
-    66: 0xfed000,
-    60: 0xff1111,
-}
+//const colors = {
+//    //10: 0x082057,
+//    //23: 0x0a1b2b
+//    //23: 0xf5e4d4,
+//    //23: 0xff1111,
+//    66: 0xfed000,
+//    60: 0xff1111,
+//}
+//
+const teamColors = {
+    1: 0xCC0000,
+    2: 0x00468B,
+    3: 0x154B94,
+    4: 0x000000,
+    5: 0x000000,
+    6: 0x010101,
+    7: 0x003087,
+    8: 0xA6192E,
+    9: 0x010101,
+    10: 0x00205B,
+    12: 0xFFFFFF,
+    13: 0x041E42,
+    14: 0x00205B,
+    15: 0x041E42,
+    16: 0x010101,
+    17: 0xC8102E,
+    18: 0xFFFFFF,
+    19: 0x004986,
+    20: 0xC8102E,
+    21: 0xFFFFFF,
+    22: 0x00205B,
+    23: 0x00205B,
+    24: 0x010101,
+    25: 0x000000,
+    26: 0xA2AAAD,
+    28: 0x010101,
+    29: 0x041E42,
+    30: 0x0E4431,
+    52: 0x041E42,
+    54: 0x000000,
+    55: 0x001425,
+    59: 0x6CACE4,
+};
 
 function renderPoint(d) {
     const c = d[1];
@@ -111,7 +146,7 @@ function renderPoint(d) {
             z,
         ], 3));
 
-    const color = colors[parseInt(d[10])]
+    const color = teamColors[parseInt(d[10])]
     const material = new THREE.PointsMaterial({ 
         color: color,
         size: size,
