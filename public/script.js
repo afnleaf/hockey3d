@@ -13,6 +13,7 @@
 //shot_miss_reason,     12
 //highlight_clip_url    13
 
+
 // parse data from csv string
 function parseCSV() {
     const ds = [];
@@ -52,6 +53,32 @@ function calcVectors(xyz) {
     return vectors;
 }
 
+//goal                //505
+//shot-on-goal        //506
+//missed-shot         //507
+//blocked-shot        //508
+//takeaway            //525
+//penalty             //509
+//giveaway            //504
+//hit                 //503
+//faceoff             //502
+//failed-shot-attempt //537
+
+//505
+//506
+//507
+//508
+//525
+//509
+//504
+//503
+//502
+//537
+
+
+
+
+
 const DEFAULT_SIZE = 1.5;
 const DEFAULT_HEIGHT = 1;
 const DEFAULT_ALPHA = 0.1;
@@ -60,6 +87,13 @@ const sizes = {
     505: 6,
     506: 3.5,
     507: 2,
+    508: 1.9,
+    525: 4,
+    509: 4,
+    504: 5,
+    503: 3.5,
+    502: 1.5,
+    537: 1.5,
 }
 
 const heights = {
@@ -72,7 +106,18 @@ const alphas = {
     505: 1.0,
     506: 0.75,
     507: 0.5,
-}
+} 
+
+//503
+//502
+//506
+//508
+//507
+//504
+//525
+//509
+//505
+//537
 
 // hash table for team id: hex colors
 //const colors = {

@@ -1,4 +1,19 @@
 // HUD via DOM
+//
+//Event Types Summary:
+//-----------------
+//hit: 5790
+//faceoff: 5415
+//shot-on-goal: 5345
+//blocked-shot: 3385
+//missed-shot: 2710
+//giveaway: 1823
+//takeaway: 1376
+//penalty: 755
+//goal: 653
+//failed-shot-attempt: 1
+//
+//Total unique event types: 10
 
 // parse team info
 const awayTeam = JSON.parse(awayJSON);
