@@ -1,4 +1,5 @@
 use std::error::Error;
+//use std::collections::HashMap;
 // crates
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -6,7 +7,7 @@ use serde_json::Value;
 //use reqwest;
 
 #[derive(Debug, Serialize, Deserialize)]
-struct GameData {
+pub struct GameData {
     #[serde(rename = "awayTeam")]
     away_team: TeamInfo,
     #[serde(rename = "homeTeam")]
@@ -19,7 +20,7 @@ struct GameData {
 
 // teams info 
 #[derive(Debug, Serialize, Deserialize)]
-struct TeamInfo {
+pub struct TeamInfo {
     //home or away
     //
     #[serde(rename = "commonName")]
@@ -46,9 +47,10 @@ struct CommonName {
 
 // a list of all the plays during the game
 #[derive(Debug, Serialize, Deserialize)]
-struct PlayByPlay {
-    plays: Vec<Play>,
+pub struct PlayByPlay {
+    pub plays: Vec<Play>,
 }
+
 
 // why does this need to be outside?
 // cause period has multiple data in it
@@ -59,7 +61,7 @@ struct PeriodDescriptor {
 
 // top level play info
 #[derive(Debug, Serialize, Deserialize)]
-struct Play {
+pub struct Play {
     #[serde(rename = "eventId")]
     event_id: i32,
     #[serde(rename = "typeCode")]
@@ -78,7 +80,7 @@ struct Play {
 
 // the fields we are looking for inside the json
 #[derive(Debug, Serialize, Deserialize)]
-struct PlayDetails {
+pub struct PlayDetails {
     #[serde(rename = "xCoord")]
     x_coord: Option<i32>,
     #[serde(rename = "yCoord")]
@@ -106,24 +108,25 @@ struct PlayDetails {
 // game_seconds: i32,   
 // period_seconds: i32, 
 #[derive(Debug)]
-struct EventData {
-    event_id: i32,
-    type_code: i32,
-    event_type: String,
-    period: i32,
-    time_period_mmss: String, // time in string format per period (MM)
-    time_period_seconds: i32, // time in period (1199 to 0)
-    time_game_seconds: i32, // time from game start (0 to 3600+)
-    x_coord: Option<i32>,
-    y_coord: Option<i32>,
-    player_id: Option<i32>,
-    team_id: Option<i32>,
+pub struct EventData {
+    pub event_id: i32,
+    pub type_code: i32,
+    pub event_type: String,
+    pub period: i32,
+    pub time_period_mmss: String, // time in string format per period (MM)
+    pub time_period_seconds: i32, // time in period (1199 to 0)
+    pub time_game_seconds: i32, // time from game start (0 to 3600+)
+    pub x_coord: Option<i32>,
+    pub y_coord: Option<i32>,
+    pub player_id: Option<i32>,
+    pub team_id: Option<i32>,
     // split this into 2
     //additional_info: String,
-    shot_type: Option<String>,
-    shot_miss_reason: Option<String>,
-    highlight_clip_url: Option<String>,
+    pub shot_type: Option<String>,
+    pub shot_miss_reason: Option<String>,
+    pub highlight_clip_url: Option<String>,
 }
+
 
 impl EventData {
     fn to_csv_row(&self) -> String {
@@ -150,7 +153,7 @@ impl EventData {
 
 // to check the response as text if something isn't working
 #[allow(dead_code)]
-async fn fetch_as_text(url: &str) -> Result<(), Box<dyn Error>> {
+pub async fn fetch_as_text(url: &str) -> Result<(), Box<dyn Error>> {
     let response = reqwest::get(url).await?;
     let text = response.text().await?;
     println!("Response: {}", text);
@@ -158,7 +161,7 @@ async fn fetch_as_text(url: &str) -> Result<(), Box<dyn Error>> {
 }
 
 // fetch generic json from external url
-async fn fetch_as_json<T>(url: &str) -> Result<T, Box<dyn Error>> 
+pub async fn fetch_as_json<T>(url: &str) -> Result<T, Box<dyn Error>> 
 where 
     T: serde::de::DeserializeOwned, 
 {
@@ -167,7 +170,7 @@ where
     Ok(jason)
 }
 
-async fn fetch_as_json_value(
+pub async fn fetch_as_json_value(
     url: &str
 ) -> Result<serde_json::Value, Box<dyn Error>> {
     let response = reqwest::get(url).await?;
@@ -183,7 +186,7 @@ fn get_player_id_from_details(details: &PlayDetails) -> Option<i32> {
         .or(details.player_id)
 }
 
-fn process_play(play: &Play) -> Option<EventData> {
+pub fn process_play(play: &Play) -> Option<EventData> {
     if let Some(details) = &play.details {
         if details.x_coord.is_none() && details.y_coord.is_none() 
             && !matches!(play.type_code, 505 | 502 | 503) { 
@@ -295,6 +298,8 @@ pub async fn pbp_to_csv(url: &str) -> Result<String, Box<dyn Error>> {
 //fn teams_info() {
 
 //}
+//
+
 
 fn pbp_to_csv2(
     json_data: Value,
@@ -305,6 +310,7 @@ fn pbp_to_csv2(
         .filter_map(process_play)
         .collect();
     plays.sort_by(|a, b| a.time_game_seconds.cmp(&b.time_game_seconds));
+    
     
     let raw_header = r#"
     event_id,
@@ -348,6 +354,7 @@ pub async fn process_pbp(
     //println!("{:?}", away_team);
     //println!("Home Team:\n{}", serde_json::to_string_pretty(&home_team)?);
     //println!("\nAway Team:\n{}", serde_json::to_string_pretty(&away_team)?);
+
     let csv: String = pbp_to_csv2(json_data).unwrap();
     //println!("{:?}", csv);
 

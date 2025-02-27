@@ -9,7 +9,7 @@ use url::Url;
 //use reqwest;
 //use usvg;
 //use resvg;
-
+use crate::jsonparser;
 
 // teams
 #[derive(Debug, Serialize, Deserialize)]
@@ -49,6 +49,10 @@ struct Schedule {
 //gamedetails
 #[derive(Debug, Serialize, Deserialize)]
 struct GameData {
+    #[serde(rename = "id")]
+    id: i32,
+    #[serde(rename = "season")]
+    season: i32,
     #[serde(rename = "awayTeam")]
     away_team: TeamInfo,
     #[serde(rename = "homeTeam")]
@@ -217,6 +221,7 @@ fn count_most_common_pixel_color(
     Ok(most_common_color)
 }
 
+
 #[derive(Debug)]
 struct Info {
     tricode: String,
@@ -305,5 +310,109 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 
 
+    Ok(())
+}
+
+// fetch team schedule
+// get list of games
+// get all games ids
+// fetch all game urls
+//
+
+fn event_types2(plays: &Vec<jsonparser::EventData>) -> Result<(), Box<dyn Error>> {
+    let mut event_strings: HashMap<String, usize> = HashMap::new();
+    
+    for play in plays {
+        //play.event_type
+        *event_strings.entry(play.event_type.clone()).or_insert(0) += 1;
+    }
+    
+    for event in event_strings.keys() {
+        println!("{}", event);
+    }
+    //println!("{:?}", event_strings);
+
+    Ok(())
+}
+
+fn event_types(plays: &Vec<jsonparser::EventData>, event_counts: &mut HashMap<String, usize>) {
+    for play in plays {
+        //*event_counts.entry(play.event_type.clone()).or_insert(0) += 1;
+        *event_counts.entry(play.type_code.to_string()).or_insert(0) += 1;
+    }
+}
+
+pub async fn playtypes() -> Result<(), Box<dyn Error>> {
+    let mut event_counts: HashMap<String, usize> = HashMap::new();
+
+    // multiple game ids via schedule
+    let sch = Url::parse("https://api-web.nhle.com/v1/club-schedule-season/TOR/20232024")?;
+    //let tricode_url = format!("{}/20242025", &team.tricode);
+    //let full_url = base_api.join(&tricode_url)?;    
+    let schedule: Schedule = fetch_as_json(sch.as_str()).await?;
+    if let Some(games) = &schedule.games {
+        for game in games {
+            let url = Url::parse(
+                &format!(
+                    "https://api-web.nhle.com/v1/gamecenter/{}/play-by-play",
+                    game.id,
+                )
+            )?;
+            println!("{}", &url);
+            let game_data: jsonparser::PlayByPlay = fetch_as_json(url.as_str()).await?;
+            let plays: Vec<jsonparser::EventData> = game_data.plays.iter()
+                .filter_map(jsonparser::process_play)
+                .collect();
+            //plays.sort_by(|a, b| a.time_game_seconds.cmp(&b.time_game_seconds));
+            // find all types of events?
+            //event_types(&plays)?;
+            event_types(&plays, &mut event_counts);
+        }
+    }
+
+    println!("\nEvent Types Summary:");
+    println!("-----------------");
+    
+    // sort events by frequency
+    let mut events: Vec<(&String, &usize)> = event_counts.iter().collect();
+    // count in descending order
+    events.sort_by(|a, b| b.1.cmp(a.1)); 
+    
+    for (event, count) in events {
+        println!("{}: {}", event, count);
+    }
+    
+    println!("\nTotal unique event types: {}", event_counts.len());
+
+
+    /*
+    let base_api = Url::parse("https://api-web.nhle.com/v1/gamecenter/")?;
+    //let game_id = "2024020884";
+    let game_id = "2024190001";
+    //let game_id = "2024020869";
+    let game_url = format!("{}/play-by-play", game_id);
+    let full_url = base_api.join(&game_url)?;
+
+    // read the JSON file
+    //fetch_as_text(full_url.as_str()).await?;
+    
+    println!("{:?}", full_url.as_str());
+    let game_data: PlayByPlay = fetch_as_json(full_url.as_str()).await?;
+
+    let json_data: Value = fetch_as_json_value(url).await?;
+    let csv: String = pbp_to_csv2(json_data).unwrap();
+    
+    //let json_data: Value = fetch_as_json_value(&team_url.as_str()).await?;
+    //println!("{:?}", json_data);
+    //println!("{}", serde_json::to_string_pretty(&json_data)?);
+    //println!("{:?}", &team_data);
+    //
+    let mut teams: Vec<Info> = vec![]; 
+    
+    // will be raw svg string
+    let mut logo = String::new();
+    let mut dlogo = String::new();
+    */
+    
     Ok(())
 }
