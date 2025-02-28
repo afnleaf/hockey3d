@@ -151,6 +151,12 @@ impl EventData {
     }
 }
 
+pub async fn debug_response(url: &str) -> Result<(), Box<dyn Error>> {
+    let text = reqwest::get(url).await?.text().await?;
+    println!("Response from {}: {}", url, text);
+    Ok(())
+}
+
 // to check the response as text if something isn't working
 #[allow(dead_code)]
 pub async fn fetch_as_text(url: &str) -> Result<(), Box<dyn Error>> {
@@ -172,9 +178,9 @@ where
 
 pub async fn fetch_as_json_value(
     url: &str
-) -> Result<serde_json::Value, Box<dyn Error>> {
+) -> Result<Value, Box<dyn Error>> {
     let response = reqwest::get(url).await?;
-    let jason: serde_json::Value = response.json().await?;
+    let jason: Value = response.json().await?;
     Ok(jason)
 }
 
@@ -302,11 +308,13 @@ pub async fn pbp_to_csv(url: &str) -> Result<String, Box<dyn Error>> {
 
 
 fn pbp_to_csv2(
-    json_data: Value,
+    //jason: Value,
+    pbp: &PlayByPlay
 ) -> Result<String, Box<dyn Error>> {
     // play by play data
-    let game_data: PlayByPlay = serde_json::from_value(json_data)?;
-    let mut plays: Vec<EventData> = game_data.plays.iter()
+    //let game_data: PlayByPlay = serde_json::from_value(jason)?;
+    //let mut plays: Vec<EventData> = game_data.plays.iter()
+    let mut plays: Vec<EventData> = pbp.plays.iter()
         .filter_map(process_play)
         .collect();
     plays.sort_by(|a, b| a.time_game_seconds.cmp(&b.time_game_seconds));
@@ -344,18 +352,24 @@ pub async fn process_pbp(
     url: &str
 ) -> Result<(String, String, String), Box<dyn Error>>{
     //let game_data: GameData = fetch_as_json(url).await?;
-    let json_data: Value = fetch_as_json_value(url).await?;
+    //let json_data: Value = fetch_as_json_value(url).await?;
+    //let jason: serde_json::Value = reqwest::get(url).await?.json().await?;
+    let json_text = reqwest::get(url).await?.text().await?;
+    let jason: Value = serde_json::from_str(&json_text)?;
+    let away_team = &jason["awayTeam"];
+    let home_team = &jason["homeTeam"];
     //println!("{:?}", json_data);
    
     // clone so we don't ruin the data that we need to parse
-    let away_team = json_data["awayTeam"].clone();
-    let home_team = json_data["homeTeam"].clone();
+    //let away_team = jason["awayTeam"].clone();
+    //let home_team = jason["homeTeam"].clone();
     //println!("{:?}", home_team);
     //println!("{:?}", away_team);
     //println!("Home Team:\n{}", serde_json::to_string_pretty(&home_team)?);
     //println!("\nAway Team:\n{}", serde_json::to_string_pretty(&away_team)?);
-
-    let csv: String = pbp_to_csv2(json_data).unwrap();
+        
+    let pbp: PlayByPlay = serde_json::from_str(&json_text)?;
+    let csv: String = pbp_to_csv2(&pbp)?;
     //println!("{:?}", csv);
 
     Ok((
