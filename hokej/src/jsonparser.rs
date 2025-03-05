@@ -6,6 +6,67 @@ use serde_json::Value;
 //use url::Url;
 //use reqwest;
 
+// teams
+#[derive(Debug, Serialize, Deserialize)]
+struct TeamData {
+    // ordered from first to last by time and period
+    #[serde(rename = "data")]
+    teams: Vec<Team>,
+}
+
+
+// teams info 
+#[derive(Debug, Serialize, Deserialize, Default)]
+struct Team {
+    #[serde(rename = "id")]
+    id: i32,
+    #[serde(rename = "franchiseId")]
+    franchise_id: Option<i32>,
+    #[serde(rename = "fullName")]
+    full_name: String,
+    #[serde(rename = "leagueId")]
+    league_id: i32,
+    #[serde(rename = "rawTricode")]
+    raw_tricode: String,
+    #[serde(rename = "triCode")]
+    tricode: String, 
+}
+
+
+// schedule
+//games
+#[derive(Debug, Serialize, Deserialize)]
+struct Schedule {
+    #[serde(rename = "games")]
+    games: Option<Vec<GameData>>
+}
+
+//gamedetails
+#[derive(Debug, Serialize, Deserialize)]
+struct GameData {
+    #[serde(rename = "id")]
+    id: i32,
+    #[serde(rename = "season")]
+    season: i32,
+    #[serde(rename = "awayTeam")]
+    away_team: TeamInfo,
+    #[serde(rename = "homeTeam")]
+    home_team: TeamInfo,
+}
+
+// teams info 
+#[derive(Debug, Serialize, Deserialize)]
+struct TeamInfo {
+    //home or away
+    //
+    #[serde(rename = "abbrev")]
+    abbrev: String,
+    #[serde(rename = "darkLogo")]
+    dark_logo: String,
+    #[serde(rename = "logo")]
+    logo: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GameData {
     #[serde(rename = "awayTeam")]
@@ -66,7 +127,7 @@ pub struct Play {
     event_id: i32,
     #[serde(rename = "typeCode")]
     type_code: i32,
-    #[serde(rename = "typeDescKey")]
+#[serde(rename = "typeDescKey")]
     type_desc_key: String,
     #[serde(rename = "periodDescriptor")]
     period_descriptor: PeriodDescriptor,
