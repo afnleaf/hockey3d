@@ -5,70 +5,86 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 //use url::Url;
 //use reqwest;
+//
 
-// teams
+// NHL API
+// Teams	
+// https://api.nhle.com/stats/rest/en/team
+//
+// Schedule	
+// https://api-web.nhle.com/v1/club-schedule-season/TOR/20232024
+//
+// PBP	
+// https://api-web.nhle.com/v1/gamecenter/2023020204/play-by-play
+//
+// Shift	
+// https://api.nhle.com/stats/rest/en/shiftcharts?cayenneExp=gameId=2021020001
+//
+// Skaters	
+// https://api.nhle.com/stats/rest/en/skater/bios?limit=-1&start=0&cayenneExp=seasonId=20232024
+//
+
+// Teams ------------------------------------------------------------
+// a list of all the teams
 #[derive(Debug, Serialize, Deserialize)]
-struct TeamData {
-    // ordered from first to last by time and period
+pub struct TeamData {
+    // no idea what order
     #[serde(rename = "data")]
-    teams: Vec<Team>,
+    pub teams: Vec<Team>,
 }
 
 
-// teams info 
+// Team 
+// data associated with each team
 #[derive(Debug, Serialize, Deserialize, Default)]
-struct Team {
+pub struct Team {
     #[serde(rename = "id")]
-    id: i32,
+    pub id: i32,
     #[serde(rename = "franchiseId")]
-    franchise_id: Option<i32>,
+    pub franchise_id: Option<i32>,
     #[serde(rename = "fullName")]
-    full_name: String,
+    pub full_name: String,
     #[serde(rename = "leagueId")]
-    league_id: i32,
+    pub league_id: i32,
     #[serde(rename = "rawTricode")]
-    raw_tricode: String,
+    pub raw_tricode: String,
     #[serde(rename = "triCode")]
-    tricode: String, 
+    pub tricode: String, 
 }
 
-
-// schedule
-//games
+// Schedule ---------------------------------------------------------
+// a list of all the games in a season for a team with a tricode
 #[derive(Debug, Serialize, Deserialize)]
-struct Schedule {
+pub struct Schedule {
+    #[serde(rename = "currentSeason")]
+    pub current_season: i32,
     #[serde(rename = "games")]
-    games: Option<Vec<GameData>>
+    pub games: Option<Vec<GameData>>
 }
 
-//gamedetails
-#[derive(Debug, Serialize, Deserialize)]
-struct GameData {
-    #[serde(rename = "id")]
-    id: i32,
-    #[serde(rename = "season")]
-    season: i32,
-    #[serde(rename = "awayTeam")]
-    away_team: TeamInfo,
-    #[serde(rename = "homeTeam")]
-    home_team: TeamInfo,
-}
-
-// teams info 
-#[derive(Debug, Serialize, Deserialize)]
-struct TeamInfo {
-    //home or away
-    //
-    #[serde(rename = "abbrev")]
-    abbrev: String,
-    #[serde(rename = "darkLogo")]
-    dark_logo: String,
-    #[serde(rename = "logo")]
-    logo: String,
-}
-
+// Game
+// game details from the schedule
+// use id to fetch game
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GameData {
+    #[serde(rename = "id")]
+    pub id: i32,
+    #[serde(rename = "season")]
+    pub season: i32,
+}
+
+// Play by play -----------------------------------------------------
+//
+
+// a list of all the plays during the game
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PlayByPlay {
+    pub plays: Vec<Play>,
+}
+
+// not being used right now
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PBP {
     #[serde(rename = "awayTeam")]
     away_team: TeamInfo,
     #[serde(rename = "homeTeam")]
@@ -78,12 +94,10 @@ pub struct GameData {
     plays: Vec<Play>,
 }
 
-
-// teams info 
+// Teams info 
+// home or away
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TeamInfo {
-    //home or away
-    //
     #[serde(rename = "commonName")]
     team_name: CommonName,
     #[serde(rename = "id")]
@@ -106,20 +120,6 @@ struct CommonName {
     default: String,
 }
 
-// a list of all the plays during the game
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PlayByPlay {
-    pub plays: Vec<Play>,
-}
-
-
-// why does this need to be outside?
-// cause period has multiple data in it
-#[derive(Debug, Serialize, Deserialize)]
-struct PeriodDescriptor {
-    number: i32,
-}
-
 // top level play info
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Play {
@@ -127,7 +127,7 @@ pub struct Play {
     event_id: i32,
     #[serde(rename = "typeCode")]
     type_code: i32,
-#[serde(rename = "typeDescKey")]
+    #[serde(rename = "typeDescKey")]
     type_desc_key: String,
     #[serde(rename = "periodDescriptor")]
     period_descriptor: PeriodDescriptor,
@@ -137,6 +137,13 @@ pub struct Play {
     time_in_period: String,
     // a lot of info inside this!!!
     details: Option<PlayDetails>,
+}
+
+// why does this need to be outside?
+// cause period has multiple data in it
+#[derive(Debug, Serialize, Deserialize)]
+struct PeriodDescriptor {
+    number: i32,
 }
 
 // the fields we are looking for inside the json
@@ -165,7 +172,8 @@ pub struct PlayDetails {
     highlight_clip_url: Option<String>,
 }
 
-// csv structure for our simplified game event data
+// csv --------------------------------------------------------------
+// structure for our simplified game event data
 // game_seconds: i32,   
 // period_seconds: i32, 
 #[derive(Debug)]
@@ -218,32 +226,32 @@ pub async fn debug_response(url: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// to check the response as text if something isn't working
-#[allow(dead_code)]
-pub async fn fetch_as_text(url: &str) -> Result<(), Box<dyn Error>> {
-    let response = reqwest::get(url).await?;
-    let text = response.text().await?;
-    println!("Response: {}", text);
-    Ok(())
-}
-
-// fetch generic json from external url
-pub async fn fetch_as_json<T>(url: &str) -> Result<T, Box<dyn Error>> 
-where 
-    T: serde::de::DeserializeOwned, 
-{
-    let response = reqwest::get(url).await?;
-    let jason = response.json::<T>().await?;
-    Ok(jason)
-}
-
-pub async fn fetch_as_json_value(
-    url: &str
-) -> Result<Value, Box<dyn Error>> {
-    let response = reqwest::get(url).await?;
-    let jason: Value = response.json().await?;
-    Ok(jason)
-}
+//// to check the response as text if something isn't working
+//#[allow(dead_code)]
+//pub async fn fetch_as_text(url: &str) -> Result<(), Box<dyn Error>> {
+//    let response = reqwest::get(url).await?;
+//    let text = response.text().await?;
+//    println!("Response: {}", text);
+//    Ok(())
+//}
+//
+//// fetch generic json from external url
+//pub async fn fetch_as_json<T>(url: &str) -> Result<T, Box<dyn Error>> 
+//where 
+//    T: serde::de::DeserializeOwned, 
+//{
+//    let response = reqwest::get(url).await?;
+//    let jason = response.json::<T>().await?;
+//    Ok(jason)
+//}
+//
+//pub async fn fetch_as_json_value(
+//    url: &str
+//) -> Result<Value, Box<dyn Error>> {
+//    let response = reqwest::get(url).await?;
+//    let jason: Value = response.json().await?;
+//    Ok(jason)
+//}
 
 fn get_player_id_from_details(details: &PlayDetails) -> Option<i32> {
     details.shooting_player_id
@@ -323,49 +331,49 @@ fn calculate_time_values(period: i32, time_str: &str) -> (i32, i32) {
     (time_game_seconds, time_period_seconds)
 }
 
-pub async fn pbp_to_csv(url: &str) -> Result<String, Box<dyn Error>> {
-    let game_data: PlayByPlay = fetch_as_json(url).await?;
-
-    let mut events: Vec<EventData> = game_data.plays.iter()
-        .filter_map(process_play)
-        .collect();
-
-    events.sort_by(|a, b| a.time_game_seconds.cmp(&b.time_game_seconds));
-
-    let raw_header = r#"
-    event_id,
-    type_code,
-    event_type,
-    period,
-    time_period_mmss,
-    time_period_seconds,
-    time_game_seconds,
-    x_coord,
-    y_coord,
-    player_id,
-    team_id,
-    shot_type,
-    shot_miss_reason,
-    highlight_clip_url
-    "#.trim().replace("\n", "").replace("    ", "");
-
-    let mut csv_content = String::from(raw_header);
-    csv_content.push('\n');
-
-    for event in events {
-        csv_content.push_str(&event.to_csv_row());
-        csv_content.push('\n');
-    }
-
-    Ok(csv_content)
-}
-
-// should just take the same exact json as a string
-// then embed it directly?
-//fn teams_info() {
-
+//pub async fn pbp_to_csv(url: &str) -> Result<String, Box<dyn Error>> {
+//    let game_data: PlayByPlay = fetch_as_json(url).await?;
+//
+//    let mut events: Vec<EventData> = game_data.plays.iter()
+//        .filter_map(process_play)
+//        .collect();
+//
+//    events.sort_by(|a, b| a.time_game_seconds.cmp(&b.time_game_seconds));
+//
+//    let raw_header = r#"
+//    event_id,
+//    type_code,
+//    event_type,
+//    period,
+//    time_period_mmss,
+//    time_period_seconds,
+//    time_game_seconds,
+//    x_coord,
+//    y_coord,
+//    player_id,
+//    team_id,
+//    shot_type,
+//    shot_miss_reason,
+//    highlight_clip_url
+//    "#.trim().replace("\n", "").replace("    ", "");
+//
+//    let mut csv_content = String::from(raw_header);
+//    csv_content.push('\n');
+//
+//    for event in events {
+//        csv_content.push_str(&event.to_csv_row());
+//        csv_content.push('\n');
+//    }
+//
+//    Ok(csv_content)
 //}
 //
+//// should just take the same exact json as a string
+//// then embed it directly?
+////fn teams_info() {
+//
+////}
+////
 
 
 fn pbp_to_csv2(

@@ -16,7 +16,6 @@ mod htmlpacker;
 mod jsonparser;
 
 
-
 // async !!
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>>{
@@ -37,7 +36,7 @@ async fn main() -> Result<(), Box<dyn Error>>{
     
     let csv_texts: Vec<String> = vec![];
     //let csv_content = jsonparser::pbp_to_csv(&full_url.as_str()).await?;
-    let csv_content = jsonparser::pbp_to_csv(url).await?;
+    //let csv_content = jsonparser::pbp_to_csv(url).await?;
     //println!("{}", csv_content);
 
     let (
@@ -88,7 +87,7 @@ async fn main() -> Result<(), Box<dyn Error>>{
         css_text,
         external_scripts_text,
         local_scripts_text,
-        csv_content,
+        csv,
         away_team,
         home_team,
     );

@@ -11,94 +11,34 @@ use url::Url;
 //use resvg;
 use crate::jsonparser;
 
-// teams
-#[derive(Debug, Serialize, Deserialize)]
-struct TeamData {
-    // ordered from first to last by time and period
-    #[serde(rename = "data")]
-    teams: Vec<Team>,
-}
-
-
-// teams info 
-#[derive(Debug, Serialize, Deserialize, Default)]
-struct Team {
-    #[serde(rename = "id")]
-    id: i32,
-    #[serde(rename = "franchiseId")]
-    franchise_id: Option<i32>,
-    #[serde(rename = "fullName")]
-    full_name: String,
-    #[serde(rename = "leagueId")]
-    league_id: i32,
-    #[serde(rename = "rawTricode")]
-    raw_tricode: String,
-    #[serde(rename = "triCode")]
-    tricode: String, 
-}
-
-
-// schedule
-//games
-#[derive(Debug, Serialize, Deserialize)]
-struct Schedule {
-    #[serde(rename = "games")]
-    games: Option<Vec<GameData>>
-}
-
-//gamedetails
-#[derive(Debug, Serialize, Deserialize)]
-struct GameData {
-    #[serde(rename = "id")]
-    id: i32,
-    #[serde(rename = "season")]
-    season: i32,
-    #[serde(rename = "awayTeam")]
-    away_team: TeamInfo,
-    #[serde(rename = "homeTeam")]
-    home_team: TeamInfo,
-}
-
-// teams info 
-#[derive(Debug, Serialize, Deserialize)]
-struct TeamInfo {
-    //home or away
-    //
-    #[serde(rename = "abbrev")]
-    abbrev: String,
-    #[serde(rename = "darkLogo")]
-    dark_logo: String,
-    #[serde(rename = "logo")]
-    logo: String,
-}
 
 // to check the response as text if something isn't working
-#[allow(dead_code)]
-async fn fetch_as_text(url: &str) -> Result<String, Box<dyn Error>> {
-    let response = reqwest::get(url).await?;
-    let text = response.text().await?;
-    //println!("Response: {}", text);
-    Ok(text)
-}
-
-// fetch generic json from external url
-async fn fetch_as_json<T>(url: &str) -> Result<T, Box<dyn Error>> 
-where 
-    T: serde::de::DeserializeOwned, 
-{
-    let response = reqwest::get(url).await?;
-    let jason = response.json::<T>().await?;
-    Ok(jason)
-}
-
-#[allow(dead_code)]
-async fn fetch_as_json_value(
-    url: &str
-) -> Result<serde_json::Value, Box<dyn Error>> {
-    let response = reqwest::get(url).await?;
-    let jason: serde_json::Value = response.json().await?;
-    Ok(jason)
-}
+//#[allow(dead_code)]
+//async fn fetch_as_text(url: &str) -> Result<String, Box<dyn Error>> {
+//    let response = reqwest::get(url).await?;
+//    let text = response.text().await?;
+//    //println!("Response: {}", text);
+//    Ok(text)
+//}
+//
+//// fetch generic json from external url
+//async fn fetch_as_json<T>(url: &str) -> Result<T, Box<dyn Error>> 
+//where 
+//    T: serde::de::DeserializeOwned, 
+//{
+//    let response = reqwest::get(url).await?;
+//    let jason = response.json::<T>().await?;
+//    Ok(jason)
+//}
+//
+//#[allow(dead_code)]
+//async fn fetch_as_json_value(
+//    url: &str
+//) -> Result<serde_json::Value, Box<dyn Error>> {
+//    let response = reqwest::get(url).await?;
+//    let jason: serde_json::Value = response.json().await?;
+//    Ok(jason)
+//}
 
 async fn find_logos(
     url: &str,
@@ -237,7 +177,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //let mut codes: Vec<String> = vec![];
     // make the url
     let team_url = Url::parse("https://api.nhle.com/stats/rest/en/team")?;
-    let team_data: TeamData = fetch_as_json(&team_url.as_str()).await?;
+    let team_data: jsonparser::TeamData = fetch_as_json(&team_url.as_str())
+                                            .await?;
     //let json_data: Value = fetch_as_json_value(&team_url.as_str()).await?;
     //println!("{:?}", json_data);
     //println!("{}", serde_json::to_string_pretty(&json_data)?);
@@ -251,7 +192,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         //if team.franchise_id.is_none() {
         //    println!("Team '{}' has no franchise_id", team.full_name);
         //}
-        let base_api = Url::parse("https://api-web.nhle.com/v1/club-schedule-season/")?;
+        let base_api = Url::parse(
+                        "https://api-web.nhle.com/v1/club-schedule-season/"
+                       )?;
         let tricode_url = format!("{}/20242025", &team.tricode);
         let full_url = base_api.join(&tricode_url)?;
         println!("{}", &full_url.as_str());
@@ -319,7 +262,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
 // fetch all game urls
 //
 
-fn event_types2(plays: &Vec<jsonparser::EventData>) -> Result<(), Box<dyn Error>> {
+fn event_types2(
+    plays: &Vec<jsonparser::EventData>
+) -> Result<(), Box<dyn Error>> {
     let mut event_strings: HashMap<String, usize> = HashMap::new();
     
     for play in plays {
@@ -335,7 +280,10 @@ fn event_types2(plays: &Vec<jsonparser::EventData>) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
-fn event_types(plays: &Vec<jsonparser::EventData>, event_counts: &mut HashMap<String, usize>) {
+fn event_types(
+    plays: &Vec<jsonparser::EventData>,
+    event_counts: &mut HashMap<String, usize>
+) {
     for play in plays {
         //*event_counts.entry(play.event_type.clone()).or_insert(0) += 1;
         *event_counts.entry(play.type_code.to_string()).or_insert(0) += 1;
@@ -349,7 +297,7 @@ pub async fn playtypes() -> Result<(), Box<dyn Error>> {
     let sch = Url::parse("https://api-web.nhle.com/v1/club-schedule-season/TOR/20232024")?;
     //let tricode_url = format!("{}/20242025", &team.tricode);
     //let full_url = base_api.join(&tricode_url)?;    
-    let schedule: Schedule = fetch_as_json(sch.as_str()).await?;
+    let schedule: jsonparser::Schedule = fetch_as_json(sch.as_str()).await?;
     if let Some(games) = &schedule.games {
         for game in games {
             let url = Url::parse(
@@ -359,7 +307,8 @@ pub async fn playtypes() -> Result<(), Box<dyn Error>> {
                 )
             )?;
             println!("{}", &url);
-            let game_data: jsonparser::PlayByPlay = fetch_as_json(url.as_str()).await?;
+            let game_data: jsonparser::PlayByPlay = fetch_as_json(url.as_str())
+                                                                .await?;
             let plays: Vec<jsonparser::EventData> = game_data.plays.iter()
                 .filter_map(jsonparser::process_play)
                 .collect();
