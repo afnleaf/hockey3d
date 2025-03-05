@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // to get schedule
         let parsed_schedule_url = Url::parse(
             &format!(
-                "https://api-web.nhle.com/v1/gamecenter/{}/play-by-play",
+                "https://api-web.nhle.com/v1/club-schedule-season/{}/20232024",
                 &team.tricode,
             )
         )?;
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         game.id,
                     )
                 )?;
-                println!("{}", &url);
+                println!("{}:{}", &team.tricode, &url);
                 //let game_data: jsonparser::PlayByPlay = fetch_as_json(url.as_str())
                 //                                            .await?;
                 //let plays: Vec<jsonparser::EventData> = game_data.plays.iter()

@@ -57,7 +57,7 @@ pub struct Team {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Schedule {
     #[serde(rename = "currentSeason")]
-    pub current_season: i32,
+    pub current_season: Option<i32>,
     #[serde(rename = "games")]
     pub games: Option<Vec<GameData>>
 }
