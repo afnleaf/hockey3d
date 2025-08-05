@@ -1,5 +1,7 @@
 # hockey3d
-3d visualization of a hockey game from play by play data
+3d visualization of a hockey game from play by play data.
+
+![](hockey3ddemo.png)
 
 **concept**:
 - find play by play data
