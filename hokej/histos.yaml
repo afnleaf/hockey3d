@@ -1,0 +1,20 @@
+# Pack from this directory: `histos histos.yaml -o ../output/index.html`
+# Generate `./public/data.js` first (`cargo run` in hokej/).
+# Paths are relative to the working directory, not this file.
+pack:
+  runtime:
+    enabled: false
+  metadata:
+    title: "hokej"
+    author: "me"
+    description: "3d visualization of a hockey game from play by play data"
+    keywords: "hockey, three.js, nhl"
+  css:
+    - https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css
+  scripts:
+    - https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js
+    - https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/TrackballControls.min.js
+    - ./public/data.js
+    - ./public/arena.js
+    - ./public/script.js
+    - ./public/hud.js

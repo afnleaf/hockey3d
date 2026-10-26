@@ -2,6 +2,10 @@
 name = "hokej"
 version = "0.1.0"
 edition = "2024"
+default-run = "hokej"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 csv = "1.3"

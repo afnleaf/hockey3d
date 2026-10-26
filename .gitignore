@@ -25,3 +25,4 @@ Cargo.lock
 /output
 *.html
 /old
+hokej/public/data.js
