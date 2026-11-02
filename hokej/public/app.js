@@ -47,7 +47,8 @@ const FIRST_DAY = "2009-10-01";
       #game-list { max-width: 720px; margin: 20px auto; padding: 0 16px;
         display: flex; flex-direction: column; gap: 10px; }
       #game-list .message { text-align: center; padding: 40px; opacity: 0.8; }
-      .game-card { display: grid; grid-template-columns: 1fr auto 1fr auto;
+      .game-card { display: grid;
+        grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr) 88px 200px 84px;
         align-items: center; gap: 16px; padding: 12px 18px; border-radius: 8px;
         background: #1f232b; border: 1px solid #2c3039; text-align: left;
         width: 100%; color: inherit; font: inherit; }
@@ -58,8 +59,7 @@ const FIRST_DAY = "2009-10-01";
       .game-card .team.home { justify-content: flex-end; }
       .game-card img { width: 40px; height: 40px; }
       .game-card .abbrev { font-size: 20px; font-weight: bold; }
-      .game-card .score { font-size: 22px; font-weight: bold;
-        min-width: 70px; text-align: center; }
+      .game-card .score { font-size: 22px; font-weight: bold; text-align: center; }
       .game-card .state { display: flex; flex-direction: column; align-items: center;
         justify-content: center; gap: 4px; width: 84px; font-size: 13px;
         color: #b8bfcc; text-align: center; white-space: nowrap; }
@@ -75,6 +75,10 @@ const FIRST_DAY = "2009-10-01";
       #game-list[data-filter="3"] .game-card:not([data-type="3"]),
       #game-list[data-filter="4"] .game-card:not([data-type="4"]) { display: none; }
       .game-card .type.t4 { background: #1f4a6b; }
+      .game-card .time, .game-card .venue { font-size: 13px; color: #9aa3b5;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .game-card .time { text-align: left; font-variant-numeric: tabular-nums;
+        padding-left: 16px; }
       #back-to-list { position: fixed; top: 20px; left: 20px; z-index: 1100;
         font: 15px 'Atkinson Hyperlegible Next', sans-serif; }
       #visualizer-status { position: fixed; top: 50%; left: 50%;
@@ -190,9 +194,8 @@ const FIRST_DAY = "2009-10-01";
                 return { text: "Final" + extra, cls: "", loadable: true };
             }
             default: {
-                const t = new Date(g.startTimeUTC);
                 const text = g.gameScheduleState === "PPD" ? "Postponed"
-                    : t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+                    : "Scheduled";
                 return { text, cls: "", loadable: false };
             }
         }
@@ -217,8 +220,16 @@ const FIRST_DAY = "2009-10-01";
             state.append(type);
         }
         state.append(st.text);
+        const time = document.createElement("div");
+        time.className = "time";
+        time.textContent = g.startTimeUTC ? new Date(g.startTimeUTC)
+            .toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+        const venue = document.createElement("div");
+        venue.className = "venue";
+        venue.textContent = g.venue?.default ?? "";
+        venue.title = venue.textContent;
         card.append(teamCell(g.awayTeam, "away"), score,
-            teamCell(g.homeTeam, "home"), state);
+            teamCell(g.homeTeam, "home"), time, venue, state);
         if (st.loadable) {
             card.title = `Open ${g.awayTeam.abbrev} @ ${g.homeTeam.abbrev}`;
             card.addEventListener("click", () => { location.hash = "game=" + g.id; });
@@ -300,8 +311,10 @@ const FIRST_DAY = "2009-10-01";
             return;
         }
         document.title = "hokej";
+        // Today's games mostly start in the evening, so a fresh load shows
+        // the last day that has finished games.
         showList(date && DATE_RE.test(date) ? date
-            : shownDateForBack || shownDate || localToday());
+            : shownDateForBack || shownDate || shiftDate(localToday(), -1));
     }
 
     function goToDate(date) {
