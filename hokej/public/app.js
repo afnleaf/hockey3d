@@ -5,7 +5,14 @@ import { pause } from "./timeline.js";
 // Routes: "" = game list, "#date=YYYY-MM-DD" = list for a day,
 // "#game=ID" = visualizer.
 
-const RELAY_BASE = "http://127.0.0.1:8790";
+// __RELAY_BASE__ is set by `bun build --define` in pack.sh. A "#relay=URL"
+// link overrides it for this tab; later route changes rewrite the hash.
+const RELAY_BASE = (() => {
+    const fromHash = new URLSearchParams(location.hash.slice(1)).get("relay");
+    if (fromHash) sessionStorage.setItem("relay", fromHash);
+    return sessionStorage.getItem("relay")
+        ?? (typeof __RELAY_BASE__ !== "undefined" ? __RELAY_BASE__ : "http://127.0.0.1:8790");
+})();
 const GAME_ID_RE = /^(20090[2-9]|20[1-9]\d{3})\d{4}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // 2009-10 opening night; 2009 preseason feed has goals only
@@ -132,7 +139,7 @@ const FIRST_DAY = "2009-10-01";
     async function fetchJSON(path) {
         let r;
         try {
-            r = await fetch(RELAY_BASE + path);
+            r = await fetch(RELAY_BASE + path, { headers: { "X-Histos-App": "hokej" } });
         } catch (e) {
             throw new Error("Relay unreachable at " + RELAY_BASE);
         }

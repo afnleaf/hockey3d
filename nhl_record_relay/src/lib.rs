@@ -1,7 +1,9 @@
 use axum::{
     Router,
     extract::{Path, State},
-    http::{HeaderValue, Method, StatusCode, header},
+    extract::Request,
+    http::{HeaderName, HeaderValue, Method, StatusCode, header},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
 };
@@ -22,11 +24,18 @@ const LIVE_TTL: u64 = 20;
 const FINAL_RECHECK: u64 = 6 * 3600;
 const FREEZE_AFTER: u64 = 7 * 86400;
 
+// A file:// page sends `Origin: null`, which any page can also send, so the
+// app header is what separates hokej from other sites' scripts. It does not
+// stop non-browser clients.
+pub const APP_HEADER: &str = "x-histos-app";
+pub const APP_NAME: &str = "hokej";
+
 pub struct Config {
     pub cache_dir: PathBuf,
-    pub allowed_origin: String,
+    pub allowed_origins: Vec<String>,
     pub web_base: String,
     pub stats_base: String,
+    pub index: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy)]
@@ -195,9 +204,34 @@ async fn serve(relay: Arc<Relay>, kind: Kind, id: String) -> Response {
     }
 }
 
+async fn require_app(req: Request, next: Next) -> Response {
+    if req.headers().get(APP_HEADER).is_some_and(|v| v == APP_NAME) {
+        next.run(req).await
+    } else {
+        StatusCode::FORBIDDEN.into_response()
+    }
+}
+
+// Read per request so a repack shows up without a relay restart.
+async fn index(State(r): State<Arc<Relay>>) -> Response {
+    let Some(path) = &r.cfg.index else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    match tokio::fs::read(path).await {
+        Ok(body) => ([(header::CONTENT_TYPE, "text/html; charset=utf-8"), (header::CACHE_CONTROL, "no-store")], body).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
 pub fn app(cfg: Config) -> Router {
     std::fs::create_dir_all(&cfg.cache_dir).expect("cache dir");
-    let origin: HeaderValue = cfg.allowed_origin.parse().expect("allowed origin");
+    let origins: Vec<HeaderValue> =
+        cfg.allowed_origins.iter().map(|o| o.parse().expect("allowed origin")).collect();
+    let cors = CorsLayer::new()
+        .allow_origin(origins)
+        .allow_methods([Method::GET])
+        .allow_headers([HeaderName::from_static(APP_HEADER)])
+        .max_age(Duration::from_secs(86400));
     let relay = Arc::new(Relay {
         cfg,
         http: reqwest::Client::builder()
@@ -224,6 +258,10 @@ pub fn app(cfg: Config) -> Router {
             "/v1/schedule/{date}",
             get(|State(r): State<Arc<Relay>>, Path(d): Path<String>| serve(r, Kind::Schedule, d)),
         )
-        .layer(CorsLayer::new().allow_origin(origin).allow_methods([Method::GET]))
+        .layer(middleware::from_fn(require_app))
+        // Outermost, so preflights are answered before the app header check.
+        .layer(cors)
+        // Added after the gate: a browser navigation cannot send the app header.
+        .route("/", get(index))
         .with_state(relay)
 }
