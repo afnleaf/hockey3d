@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="currentColor" stroke="none">
+  <g id="puck">
+    <ellipse cx="48" cy="43.5" rx="18" ry="6"/>
+    <path d="M30 46.5a18 6 0 0 0 36 0v6a18 6 0 0 1-36 0z"/>
+  </g>
+</svg>

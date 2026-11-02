@@ -7,6 +7,8 @@ const w = window.innerWidth;
 const h = window.innerHeight;
 export const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.autoClear = false;
+// Capped at 2: 3x displays would add 2.25x fill cost for little visible gain.
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(w, h);
 renderer.physicallyCorrectLights = true;
 renderer.outputEncoding = THREE.sRGBEncoding;

@@ -189,10 +189,15 @@ function playerText(id) {
     return p ? `${p.number} ${p.name}` : null;
 }
 
+function typeLabel(p) {
+    const desc = p.type === "penalty" && p.details?.descKey;
+    return desc ? `pen: ${desc.replace(/-/g, " ")}` : p.type.replace(/-/g, " ");
+}
+
 function eventRows(p, full) {
     const team = teamOf(p.teamId);
     const head = `${timeLabel(p.gameSeconds)}  ${team?.abbrev ?? ""} `
-        + p.type.replace(/-/g, " ");
+        + typeLabel(p);
     const rows = [];
     if (!full) {
         const who = playerText(p.playerId);
@@ -349,7 +354,7 @@ function timelineMarkers() {
         return { t: p.gameSeconds, type: p.type, major,
             color: team?.color ?? "#666",
             title: `${timeLabel(p.gameSeconds)} ${team?.abbrev ?? ""} `
-                + p.type.replace(/-/g, " ") };
+                + typeLabel(p) };
     });
 }
 

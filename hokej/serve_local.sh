@@ -8,6 +8,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 relay_dir="$here/../nhl_record_relay"
 
 cargo build --release --manifest-path "$relay_dir/Cargo.toml"
+bun "$here/build_icons.ts"
 
 export RELAY_ALLOWED_ORIGINS="http://localhost:8000,null"
 export RELAY_CACHE_DIR="${RELAY_CACHE_DIR:-$relay_dir/cache}"

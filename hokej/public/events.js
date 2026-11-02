@@ -140,10 +140,26 @@ function track(entry, m, base = m.opacity) {
     return m;
 }
 
-function sprite(entry, type, color, size, z = ICON_Z) {
+// Icons whose glyph points toward the attacked net.
+const DIRECTIONAL = new Set(["shot-on-goal", "missed-shot", "blocked-shot",
+    "failed-shot-attempt", "goal", "hit", "giveaway", "takeaway"]);
+
+// Sprite shaders take length() of the scale, so a negative scale.x is lost.
+// One shared geometry with mirrored UVs flips the glyph on one texture.
+let flippedGeometry = null;
+function mirroredGeometry(base) {
+    if (flippedGeometry) return flippedGeometry;
+    flippedGeometry = base.clone();
+    const uv = flippedGeometry.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setX(i, 1 - uv.getX(i));
+    return flippedGeometry;
+}
+
+function sprite(entry, type, color, size, flip = false, z = ICON_Z) {
     const m = track(entry, new THREE.SpriteMaterial({
         map: iconTexture(type, hex(color)), depthWrite: false }), 1);
     const s = new THREE.Sprite(m);
+    if (flip) s.geometry = mirroredGeometry(s.geometry);
     s.scale.set(size, size, 1);
     s.position.set(0, 0, z);
     s.userData.entry = entry;
@@ -260,18 +276,20 @@ function buildEvent(e, ctx) {
     const c = e.typeCode;
     const own = colorOf(e.teamId);
     const size = ICON_SIZE[c] ?? DEFAULT_ICON_SIZE;
+    const actor = c === 508
+        ? ctx.roster.get(e.details.shootingPlayerId)?.teamId ?? e.teamId
+        : e.teamId;
+    const flip = DIRECTIONAL.has(e.type)
+        && ctx.side(e.period, actor, e) * sx < 0;
 
     if (c >= 505 && c <= 508) {
-        const shooterTeam = c === 508
-            ? ctx.roster.get(e.details.shootingPlayerId)?.teamId ?? e.teamId
-            : e.teamId;
-        const color = colorOf(shooterTeam);
-        const side = ctx.side(e.period, shooterTeam, e) * sx;
+        const color = colorOf(actor);
+        const side = ctx.side(e.period, actor, e) * sx;
         g.add(originMark(entry, color));
         const arc = shotArc(entry, e, side, x, y, color);
         g.add(arc.object);
         g.add(stem(entry, color, ICON_Z));
-        g.add(sprite(entry, e.type, color, size));
+        g.add(sprite(entry, e.type, color, size, flip));
         entry.anim = arc.step;
     } else if (c === 503) {
         g.add(originMark(entry, own));
@@ -279,7 +297,7 @@ function buildEvent(e, ctx) {
         const ring = flat(entry, ringGeom, own, 0.9, 0.15);
         const ringMat = entry.mats[entry.mats.length - 1];
         g.add(ring);
-        g.add(sprite(entry, e.type, own, size));
+        g.add(sprite(entry, e.type, own, size, flip));
         entry.anim = (p) => {
             // shockwave expands and dies; the origin mark stays
             const r = 1.5 + p * 6;
@@ -305,7 +323,7 @@ function buildEvent(e, ctx) {
         g.add(flat(entry, new THREE.RingGeometry(1.8, 2.2, 32), 0xffffff,
             0.9, 0.11));
         g.add(disc);
-        g.add(sprite(entry, e.type, own, size));
+        g.add(sprite(entry, e.type, own, size, flip));
         entry.anim = (p) => {
             disc.rotation.x = Math.PI * (1 - p);
         };
@@ -324,14 +342,14 @@ function buildEvent(e, ctx) {
             0.14);
         arrow.scale.x = dir;
         g.add(arrow);
-        g.add(sprite(entry, e.type, own, size));
+        g.add(sprite(entry, e.type, own, size, flip));
         entry.anim = (p) => {
             arrow.scale.x = dir * (0.2 + 0.8 * p);
         };
     } else {
         g.add(originMark(entry, own));
         g.add(stem(entry, own, ICON_Z));
-        g.add(sprite(entry, e.type, own, size));
+        g.add(sprite(entry, e.type, own, size, flip));
     }
     return entry;
 }
