@@ -226,33 +226,6 @@ pub async fn debug_response(url: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-//// to check the response as text if something isn't working
-//#[allow(dead_code)]
-//pub async fn fetch_as_text(url: &str) -> Result<(), Box<dyn Error>> {
-//    let response = reqwest::get(url).await?;
-//    let text = response.text().await?;
-//    println!("Response: {}", text);
-//    Ok(())
-//}
-//
-//// fetch generic json from external url
-//pub async fn fetch_as_json<T>(url: &str) -> Result<T, Box<dyn Error>> 
-//where 
-//    T: serde::de::DeserializeOwned, 
-//{
-//    let response = reqwest::get(url).await?;
-//    let jason = response.json::<T>().await?;
-//    Ok(jason)
-//}
-//
-//pub async fn fetch_as_json_value(
-//    url: &str
-//) -> Result<Value, Box<dyn Error>> {
-//    let response = reqwest::get(url).await?;
-//    let jason: Value = response.json().await?;
-//    Ok(jason)
-//}
-
 fn get_player_id_from_details(details: &PlayDetails) -> Option<i32> {
     details.shooting_player_id
         .or(details.scoring_player_id)
@@ -330,50 +303,6 @@ fn calculate_time_values(period: i32, time_str: &str) -> (i32, i32) {
     };
     (time_game_seconds, time_period_seconds)
 }
-
-//pub async fn pbp_to_csv(url: &str) -> Result<String, Box<dyn Error>> {
-//    let game_data: PlayByPlay = fetch_as_json(url).await?;
-//
-//    let mut events: Vec<EventData> = game_data.plays.iter()
-//        .filter_map(process_play)
-//        .collect();
-//
-//    events.sort_by(|a, b| a.time_game_seconds.cmp(&b.time_game_seconds));
-//
-//    let raw_header = r#"
-//    event_id,
-//    type_code,
-//    event_type,
-//    period,
-//    time_period_mmss,
-//    time_period_seconds,
-//    time_game_seconds,
-//    x_coord,
-//    y_coord,
-//    player_id,
-//    team_id,
-//    shot_type,
-//    shot_miss_reason,
-//    highlight_clip_url
-//    "#.trim().replace("\n", "").replace("    ", "");
-//
-//    let mut csv_content = String::from(raw_header);
-//    csv_content.push('\n');
-//
-//    for event in events {
-//        csv_content.push_str(&event.to_csv_row());
-//        csv_content.push('\n');
-//    }
-//
-//    Ok(csv_content)
-//}
-//
-//// should just take the same exact json as a string
-//// then embed it directly?
-////fn teams_info() {
-//
-////}
-////
 
 
 fn pbp_to_csv2(

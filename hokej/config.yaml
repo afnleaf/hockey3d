@@ -16,3 +16,5 @@ pack:
     - ./public/arena.js
     - ./public/script.js
     - ./public/hud.js
+    - ./public/parse.js
+    - ./public/picker.js

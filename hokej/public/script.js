@@ -15,19 +15,20 @@
 
 
 // parse data from csv string
-function parseCSV() {
+function parseCSV(text) {
     const ds = [];
     let l = "";
-    for(let i = 0; i < csv.length; i++) {
-        if(csv[i] != "\n") {
-            l += csv[i];
+    for(let i = 0; i < text.length; i++) {
+        if(text[i] != "\n") {
+            l += text[i];
         } else {
             l += ",";
             ds.push(parseLine(l));
             l = "";
         }
     }
-    return ds;
+    // the header row parses to NaN coordinates and would render as a bad point
+    return ds.filter((d) => !Number.isNaN(d[0]));
 }
 
 // parse line for values
@@ -201,6 +202,7 @@ function renderPoint(d) {
     
     const point = new THREE.Points(geometry, material);
     scene.add(point);
+    eventPoints.push(point);
 }
 
 function renderEvents(data) {
@@ -211,10 +213,27 @@ function renderEvents(data) {
     });
 }
 
+// kept so a newly loaded game can replace the points without touching the rink
+const eventPoints = [];
+
+function clearEvents() {
+    for (const p of eventPoints) {
+        scene.remove(p);
+        p.geometry.dispose();
+        p.material.dispose();
+    }
+    eventPoints.length = 0;
+}
+
+function loadGameCSV(text) {
+    clearEvents();
+    renderEvents(parseCSV(text));
+}
+
 // render the river and animate it
 function renderGame() {
     console.log("test1");
-    let data = parseCSV();
+    let data = parseCSV(csv);
     renderEvents(data);
     console.log("test2");
     renderRink();

@@ -63,8 +63,9 @@ const teamColorsH = {
 };
 
 // Get team colors or use defaults
-const awayTeamColor = teamColorsH[awayTeam.id] || '#ff0000';
-const homeTeamColor = teamColorsH[homeTeam.id] || '#00ff00';
+// reassigned by setScoreboard when a game is loaded
+let awayTeamColor = teamColorsH[awayTeam.id] || '#ff0000';
+let homeTeamColor = teamColorsH[homeTeam.id] || '#00ff00';
 
 // Create main HUD container
 const hudContainer = document.createElement('div');
@@ -217,7 +218,7 @@ gameStatus.style.cssText = `
 // Period indicator
 const periodIndicator = document.createElement('div');
 periodIndicator.className = 'period-indicator';
-periodIndicator.textContent = 'Period 3'; // Would need actual period data
+periodIndicator.textContent = '';
 periodIndicator.style.cssText = `
   font-size: 14px;
   opacity: 0.8;
@@ -226,7 +227,7 @@ periodIndicator.style.cssText = `
 // Game clock
 const gameClock = document.createElement('div');
 gameClock.className = 'game-clock';
-gameClock.textContent = '05:23'; // Would need actual time data
+gameClock.textContent = '';
 gameClock.style.cssText = `
   font-size: 18px;
   font-weight: bold;
@@ -284,13 +285,28 @@ homeScore.style.cssText = `
 scoresContainer.appendChild(awayScore);
 scoresContainer.appendChild(separator);
 scoresContainer.appendChild(homeScore);
-//scoreDisplay.appendChild(gameStatus);
+scoreDisplay.appendChild(gameStatus);
 scoreDisplay.appendChild(scoresContainer);
 
-// Add teams and score to scoreboard
-scoreboard.appendChild(createTeamDisplay(awayTeam, false));
-scoreboard.appendChild(scoreDisplay);
-scoreboard.appendChild(createTeamDisplay(homeTeam, true));
+// away/home are play-by-play team objects (abbrev, commonName, score, sog,
+// darkLogo, id); status is { period, clock } display strings.
+function setScoreboard(away, home, status) {
+  awayTeamColor = teamColorsH[away.id] || '#ff0000';
+  homeTeamColor = teamColorsH[home.id] || '#00ff00';
+  awayScore.textContent = away.score ?? 0;
+  homeScore.textContent = home.score ?? 0;
+  awayScore.style.color = awayTeamColor;
+  homeScore.style.color = homeTeamColor;
+  periodIndicator.textContent = status.period;
+  gameClock.textContent = status.clock;
+  scoreboard.replaceChildren(
+    createTeamDisplay(away, false),
+    scoreDisplay,
+    createTeamDisplay(home, true),
+  );
+}
+
+setScoreboard(awayTeam, homeTeam, { period: 'Sample game', clock: '' });
 
 // Create controls container
 const controlsContainer = document.createElement('div');
