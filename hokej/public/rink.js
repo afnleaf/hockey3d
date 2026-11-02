@@ -1,5 +1,6 @@
+import { scene } from "./scene.js";
 
-function renderRink() {
+export function renderRink() {
     renderIce();
     renderLines();
     renderNets();

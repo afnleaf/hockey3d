@@ -1,5 +1,7 @@
-// Main page (daily game list) and visualizer routing. Needs parse.js
-// (pbpToCsv), script.js (loadGameCSV) and hud.js (setScoreboard).
+// Main page (daily game list) and visualizer routing.
+import { loadGame } from "./viz.js";
+import { pause } from "./timeline.js";
+
 // Routes: "" = game list, "#date=YYYY-MM-DD" = list for a day,
 // "#game=ID" = visualizer.
 
@@ -13,7 +15,8 @@ const FIRST_DAY = "2009-10-01";
     const style = document.createElement("style");
     style.textContent = `
       #main-page { position: fixed; inset: 0; z-index: 2000; overflow: auto;
-        background: #15171c; color: #eee; font: 15px Arial, sans-serif; }
+        background: #15171c; color: #eee;
+        font: 15px 'Atkinson Hyperlegible Next', sans-serif; }
       #main-page header { position: sticky; top: 0; background: #1d2027;
         display: flex; align-items: center; justify-content: center; gap: 12px;
         padding: 14px; border-bottom: 1px solid #2c3039; }
@@ -61,11 +64,11 @@ const FIRST_DAY = "2009-10-01";
       #game-list[data-filter="4"] .game-card:not([data-type="4"]) { display: none; }
       .game-card .type.t4 { background: #1f4a6b; }
       #back-to-list { position: fixed; top: 20px; left: 20px; z-index: 1100;
-        font: 15px Arial, sans-serif; }
+        font: 15px 'Atkinson Hyperlegible Next', sans-serif; }
       #visualizer-status { position: fixed; top: 50%; left: 50%;
         transform: translate(-50%, -50%); z-index: 1100; padding: 14px 20px;
         background: rgba(20, 20, 20, 0.9); color: #eee; border-radius: 8px;
-        font: 16px Arial, sans-serif; }
+        font: 16px 'Atkinson Hyperlegible Next', sans-serif; }
     `;
     document.head.appendChild(style);
 
@@ -215,13 +218,17 @@ const FIRST_DAY = "2009-10-01";
 
     async function showList(date) {
         page.hidden = false;
+        pause();
         back.hidden = true;
         vizStatus.hidden = true;
         if (date < FIRST_DAY) date = FIRST_DAY;
+        if (lastDay && date > lastDay) date = lastDay;
         if (date === shownDate && list.querySelector(".game-card")) return;
         shownDate = date;
         dayInput.value = date;
+        if (lastDay) dayInput.max = lastDay;
         page.querySelector("#prev-day").disabled = date <= FIRST_DAY;
+        page.querySelector("#next-day").disabled = !!lastDay && date >= lastDay;
         dayLabel.textContent = new Date(date + "T12:00:00Z").toLocaleDateString(
             [], { weekday: "short", month: "short", day: "numeric", year: "numeric",
                 timeZone: "UTC" });
@@ -244,23 +251,6 @@ const FIRST_DAY = "2009-10-01";
         }
     }
 
-    function periodLabel(pbp) {
-        const pd = pbp.periodDescriptor || {};
-        const n = pd.number || 0;
-        let label = pd.periodType === "SO" ? "Shootout"
-            : pd.periodType === "OT" ? "Overtime" : "Period " + n;
-        if (pbp.gameState === "OFF" || pbp.gameState === "FINAL") {
-            label = "Final" + (pd.periodType && pd.periodType !== "REG"
-                ? " (" + pd.periodType + ")" : "");
-            return { period: label, clock: "" };
-        }
-        const clock = pbp.clock || {};
-        return {
-            period: clock.inIntermission ? "Intermission after P" + n : label,
-            clock: clock.timeRemaining || "",
-        };
-    }
-
     async function showGame(id) {
         page.hidden = true;
         back.hidden = false;
@@ -268,10 +258,14 @@ const FIRST_DAY = "2009-10-01";
         vizStatus.textContent = `Loading game ${id}...`;
         const seq = ++requestSeq;
         try {
-            const pbp = await fetchJSON(`/v1/gamecenter/${id}/play-by-play`);
+            // shifts are optional: older seasons return no rows
+            const [pbp, shifts] = await Promise.all([
+                fetchJSON(`/v1/gamecenter/${id}/play-by-play`),
+                fetchJSON(`/v1/shiftcharts/${id}`)
+                    .then((json) => ({ json }), (e) => ({ error: e.message })),
+            ]);
             if (seq !== requestSeq) return;
-            loadGameCSV(pbpToCsv(pbp));
-            setScoreboard(pbp.awayTeam, pbp.homeTeam, periodLabel(pbp));
+            loadGame(pbp, shifts.json ?? null, shifts.error ?? "");
             document.title = `${pbp.awayTeam.abbrev} @ ${pbp.homeTeam.abbrev} - hokej`;
             vizStatus.hidden = true;
             // the list returns to the game's own day when Back is pressed
@@ -283,6 +277,7 @@ const FIRST_DAY = "2009-10-01";
     }
 
     let shownDateForBack = null;
+    let lastDay = null;
 
     function route() {
         const params = new URLSearchParams(location.hash.slice(1));
@@ -317,5 +312,9 @@ const FIRST_DAY = "2009-10-01";
     });
 
     window.addEventListener("hashchange", route);
-    route();
+    // today's schedule carries the current season's playoffEndDate, the
+    // last day the API schedules; route anyway if it fails
+    fetchJSON(`/v1/schedule/${localToday()}`)
+        .then((s) => { lastDay = s.playoffEndDate || null; }, () => {})
+        .finally(route);
 })();
