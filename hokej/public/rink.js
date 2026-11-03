@@ -1,12 +1,15 @@
 import { scene, renderer } from "./scene.js";
 
 export function renderRink() {
+    installLampShaderPatch();
+    const before = new Set(scene.children);
     renderIce();
     renderBoards();
     renderGlass();
     renderBenches();
     renderLines();
     renderNets();
+    mergeStatic(scene.children.filter((o) => !before.has(o)));
     renderLights();
     renderGoalLights();
 }
@@ -298,6 +301,7 @@ function renderBenches() {
         box(len - 0.6, 3, 0.5, (x0 + x1) / 2, edge + BENCH_DEPTH - 1.5, 0.45, mats.wall);
         box(len - 0.6, 1.5, 1.2, (x0 + x1) / 2, edge + BENCH_DEPTH - 0.9, 1.3, mats.pad);
         const strip = m(0x888888, 0.5);
+        strip.userData.live = true;
         benchStrips[i] = strip;
         box(len - 0.6, 0.05, 1, (x0 + x1) / 2, edge + BENCH_DEPTH - 0.2, BOARD_H + 1.5, strip);
     });
@@ -359,6 +363,7 @@ function makeSeatedPlayer() {
     // Y flip first keeps the number upright once X turns it to face the ice.
     chest.rotation.set(Math.PI / 2, Math.PI, 0);
     chest.position.set(0, 0.56, 2.9);
+    mergeStatic([...group.children], group);
     group.add(chest);
     group.visible = false;
     scene.add(group);
@@ -438,6 +443,96 @@ function addEnclosure([x0, x1], side, mats, doors) {
     }
 }
 
+// Rink pieces that share every material setting but colour become one draw: colour, and
+// opacity for transparent ones, moves into vertex colours. Inside a batch, pieces keep
+// creation order, which is how three broke depth-sort ties between them before.
+// Materials flagged userData.live are recoloured at runtime and stay apart.
+function mergeStatic(objects, parent = scene) {
+    parent.updateMatrixWorld(true);
+    const batches = new Map();
+    for (const root of objects) root.traverse((o) => {
+        if (!o.isMesh || o.isInstancedMesh || o.material.userData.live) return;
+        const key = materialKey(o);
+        if (!batches.has(key)) batches.set(key, []);
+        batches.get(key).push(o);
+    });
+    for (const meshes of batches.values()) {
+        if (meshes.length < 2) continue;
+        const src = meshes[0].material;
+        const shared = meshes.every((m) => m.material === src);
+        const material = shared ? src : src.clone();
+        if (!shared) {
+            material.color.set(0xffffff);
+            material.opacity = 1;
+            material.vertexColors = true;
+        }
+        const merged = new THREE.Mesh(mergeGeometries(meshes, !shared, !!src.map), material);
+        merged.renderOrder = meshes[0].renderOrder;
+        parent.add(merged);
+        for (const m of meshes) m.removeFromParent();
+    }
+    for (const root of objects) {
+        let meshes = 0;
+        root.traverse((o) => { if (o.isMesh) meshes++; });
+        if (!meshes) root.removeFromParent();
+    }
+}
+
+// End zones batch apart from the middle so a phone-width view still culls the far
+// end's nets and markings.
+const ZONE_X = 40;
+const _centre = new THREE.Vector3();
+
+function materialKey(mesh) {
+    const m = mesh.material;
+    if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+    const x = _centre.copy(mesh.geometry.boundingSphere.center).applyMatrix4(mesh.matrixWorld).x;
+    const zone = x < -ZONE_X ? -1 : x > ZONE_X ? 1 : 0;
+    return [m.type, m.roughness, m.metalness, m.transparent, m.depthWrite, m.side,
+        m.polygonOffset, m.polygonOffsetFactor, m.polygonOffsetUnits, m.alphaTest,
+        m.flatShading, m.map?.uuid, m.envMap?.uuid, m.emissive?.getHex(), m.transmission,
+        m.transparent ? "" : m.opacity, mesh.renderOrder, zone].join("|");
+}
+
+// Bakes each mesh's world matrix into one indexed geometry; colour gets RGBA for
+// transparent batches so per-piece opacity survives.
+function mergeGeometries(meshes, withColor, withUv) {
+    const parts = meshes.map((m) => m.geometry.clone().applyMatrix4(m.matrixWorld));
+    const alpha = meshes[0].material.transparent;
+    const cs = alpha ? 4 : 3;
+    let nv = 0, ni = 0;
+    for (const g of parts) {
+        nv += g.attributes.position.count;
+        ni += g.index ? g.index.count : g.attributes.position.count;
+    }
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3);
+    const uv = withUv ? new Float32Array(nv * 2) : null;
+    const col = withColor ? new Float32Array(nv * cs) : null;
+    const index = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+    let v = 0, i = 0;
+    parts.forEach((g, k) => {
+        const n = g.attributes.position.count;
+        pos.set(g.attributes.position.array, v * 3);
+        nor.set(g.attributes.normal.array, v * 3);
+        if (uv) uv.set(g.attributes.uv.array, v * 2);
+        if (col) {
+            const { color, opacity } = meshes[k].material;
+            const c = alpha ? [color.r, color.g, color.b, opacity] : [color.r, color.g, color.b];
+            for (let j = 0; j < n; j++) col.set(c, (v + j) * cs);
+        }
+        if (g.index) for (const x of g.index.array) index[i++] = x + v;
+        else for (let j = 0; j < n; j++) index[i++] = v + j;
+        v += n;
+        g.dispose();
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+    if (uv) geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    if (col) geo.setAttribute("color", new THREE.BufferAttribute(col, cs));
+    geo.setIndex(new THREE.BufferAttribute(index, 1));
+    return geo;
+}
 
 function renderLines() {
     const geometry = new THREE.PlaneGeometry(1, 85); 
@@ -574,13 +669,21 @@ function createHockeyNet() {
             c.quaternion.setFromUnitVectors(up, b.clone().sub(a).normalize());
             group.add(c);
         }
-        for (const p of pts) group.add(joint(p.x / IN, p.y / IN, p.z / IN, odInches, material));
+        // Smooth arcs hide the seam between cylinders; only ends and sharp
+        // corners show a gap that needs a sphere.
+        const geo = new THREE.SphereGeometry(r, 8, 6);
+        for (let i = 0; i < pts.length; i++) {
+            const p = pts[i];
+            if (i > 0 && i < pts.length - 1) {
+                const d0 = p.clone().sub(pts[i - 1]).normalize();
+                const d1 = pts[i + 1].clone().sub(p).normalize();
+                if (d0.dot(d1) > Math.cos(Math.PI / 12)) continue;
+            }
+            const s = new THREE.Mesh(geo, material);
+            s.position.copy(p);
+            group.add(s);
+        }
         return group;
-    }
-    function joint(x, y, z, odInches, material) {
-        const s = new THREE.Mesh(new THREE.SphereGeometry(odInches / 2 * IN, 16, 12), material);
-        s.position.set(x * IN, y * IN, z * IN);
-        return s;
     }
 
     // Rule 2.1: posts and crossbar red, every other exterior surface white.
@@ -728,15 +831,16 @@ const LINE_W = 2 / 12;
 function markingMaterial(color, opacity) {
     return new THREE.MeshStandardMaterial({
         color, metalness: 0.0, roughness: 0.3,
-        transparent: true, opacity, side: THREE.FrontSide,
-        // Flat on the ice; depth bias keeps them from z-fighting with it.
+        transparent: true, opacity, side: THREE.FrontSide, depthWrite: false,
+        // Coplanar marks overlap at the spots; renderOrder decides the winner.
         polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
     });
 }
 
-function addMark(geometry, material, x, y) {
+function addMark(geometry, material, x, y, order = 0) {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(x, y, 0.06);
+    mesh.renderOrder = order;
     scene.add(mesh);
 }
 
@@ -758,8 +862,8 @@ function renderFaceoffCircles() {
     endZoneFaceoffPositions.forEach(({ x, y }) => {
         addMark(ring, red, x, y);
         addMark(whiteDot, white, x, y);
-        addMark(dotRing, red, x, y);
-        addMark(dotBand, red, x, y);
+        addMark(dotRing, red, x, y, 1);
+        addMark(dotBand, red, x, y, 1);
         for (const sx of [-1, 1]) {
             for (const sy of [-1, 1]) {
                 addMark(hash, red, x + sx * hashX, y + sy * hashY);
@@ -864,30 +968,167 @@ function renderTrapezoids() {
     }
 }
 
-function renderLights() {
-    // overhead lights
-    const mainLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-    mainLight1.position.set(0, 100, 100);
-    scene.add(mainLight1);
-    const mainLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
-    mainLight2.position.set(0, -100, 100);
-    scene.add(mainLight2);
-    
-    // Arena light banks: 3 rows x 6 along, 80 ft up, so ice highlights move with the camera.
-    // physicallyCorrectLights: candela with 1/d^2 falloff, so values are tuned against the render.
-    for (const y of [-28, 0, 28]) {
-        for (let i = 0; i < 6; i++) {
-            const light = new THREE.PointLight(0xffffff, 8);
-            light.position.set(-75 + i * 30, y, 80);
-            scene.add(light);
+// Arena light banks: 3 rows x 6 along, 80 ft up. They used to be 18 PointLight(0xffffff, 8),
+// default decay 1 under physicallyCorrectLights, evaluated in every lit shader. Both
+// their diffuse and their highlights are now baked into textures; see installLampShaderPatch.
+const LAMP_Z = 80;
+const LAMP_XS = [-75, -45, -15, 15, 45, 75];
+const LAMP_YS = [-28, 0, 28];
+const LAMP_CD = 8;
+
+// Ceiling texture: the lamps as soft discs on the z = LAMP_Z plane; rougher surfaces read
+// a blurrier mip. Half float with mips built here: 8-bit GPU mips round the sparse discs
+// away (or up) a few levels down. Reflections past its edge see no lamp.
+const CEIL_W = 256, CEIL_H = 128;
+const CEIL_PX = 4; // texels per ft
+// Disc core radius in ft; sets the highlight size on the 0.05-roughness ice coat.
+const LAMP_R = 1;
+
+function lampCeilingTexture() {
+    let w = CEIL_W * CEIL_PX, h = CEIL_H * CEIL_PX;
+    let level = new Float32Array(w * h);
+    const reach = LAMP_R * CEIL_PX * 3;
+    let sum = 0;
+    for (const x of LAMP_XS) for (const y of LAMP_YS) {
+        const cx = (x / CEIL_W + 0.5) * w, cy = (y / CEIL_H + 0.5) * h;
+        for (let j = Math.floor(cy - reach); j <= Math.ceil(cy + reach); j++) {
+            for (let i = Math.floor(cx - reach); i <= Math.ceil(cx + reach); i++) {
+                const t = Math.hypot(i + 0.5 - cx, j + 0.5 - cy) / reach;
+                if (t >= 1) continue;
+                // GGX-like falloff: bright core, long soft tail.
+                const v = (1 - t) / (1 + 9 * t * t) ** 2;
+                level[j * w + i] += v;
+                sum += v;
+            }
         }
     }
+    // Disc area in ft^2 at unit radiance, so lamp power stays right whatever the falloff.
+    const area = sum / (LAMP_XS.length * LAMP_YS.length) / (CEIL_PX * CEIL_PX);
+    const half = (f) => {
+        const out = new Uint16Array(f.length);
+        for (let i = 0; i < f.length; i++) out[i] = THREE.DataUtils.toHalfFloat(f[i]);
+        return out;
+    };
+    const mipmaps = [{ data: half(level), width: w, height: h }];
+    while (w > 1 || h > 1) {
+        const nw = Math.max(1, w >> 1), nh = Math.max(1, h >> 1);
+        const next = new Float32Array(nw * nh);
+        for (let j = 0; j < nh; j++) for (let i = 0; i < nw; i++) {
+            const i0 = Math.min(2 * i, w - 1), i1 = Math.min(2 * i + 1, w - 1);
+            const j0 = Math.min(2 * j, h - 1), j1 = Math.min(2 * j + 1, h - 1);
+            next[j * nw + i] = (level[j0 * w + i0] + level[j0 * w + i1]
+                + level[j1 * w + i0] + level[j1 * w + i1]) / 4;
+        }
+        level = next; w = nw; h = nh;
+        mipmaps.push({ data: half(level), width: w, height: h });
+    }
+    const base = mipmaps[0];
+    const tex = new THREE.DataTexture(base.data, base.width, base.height,
+        THREE.RedFormat, THREE.HalfFloatType);
+    tex.mipmaps = mipmaps;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = false;
+    tex.needsUpdate = true;
+    return { tex, area };
+}
 
-    // subtle ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-    scene.add(ambientLight);
+// Lamp irradiance over the floor plan as an ambient cube (+-x, +-y, +-z per texel),
+// stored as E / IRR_MAX. Sampled 1 ft up, where boards, benches and players sit.
+const IRR_X0 = -128, IRR_Y0 = -64, IRR_W = 256, IRR_H = 128, IRR_STEP = 2;
+const IRR_Z = 1;
+const IRR_MAX = 2;
+const CUBE_AXES = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
-    // subtle hemisphere light for better color blending
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xb4d4ff, 0.3);
-    scene.add(hemiLight);
+function lampIrradiance(px, py, pz, n) {
+    let e = 0;
+    for (const x of LAMP_XS) for (const y of LAMP_YS) {
+        const dx = x - px, dy = y - py, dz = LAMP_Z - pz, d = Math.hypot(dx, dy, dz);
+        e += LAMP_CD * Math.max((dx * n[0] + dy * n[1] + dz * n[2]) / d, 0) / d;
+    }
+    return e;
+}
+
+function lampIrradianceTextures() {
+    const w = IRR_W / IRR_STEP, h = IRR_H / IRR_STEP;
+    const side = new Uint8Array(w * h * 4), vert = new Uint8Array(w * h * 4);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+        const x = IRR_X0 + (i + 0.5) * IRR_STEP, y = IRR_Y0 + (j + 0.5) * IRR_STEP;
+        const e = CUBE_AXES.map((n) =>
+            Math.round(255 * Math.min(1, lampIrradiance(x, y, IRR_Z, n) / IRR_MAX)));
+        side.set(e.slice(0, 4), (j * w + i) * 4);
+        vert.set([e[4], e[5], 0, 255], (j * w + i) * 4);
+    }
+    return [side, vert].map((data) => {
+        const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
+        tex.magFilter = tex.minFilter = THREE.LinearFilter;
+        tex.needsUpdate = true;
+        return tex;
+    });
+}
+
+// Patches every Standard/Physical shader, including those events.js builds later:
+// diffuse from the irradiance cube, highlights by mirroring the view ray off the surface
+// onto the ceiling texture. Feeding the indirect radiance slot lets three weigh it with
+// its own Fresnel and roughness terms. Needs WebGL2 (textureLod).
+function installLampShaderPatch() {
+    const [side, vert] = lampIrradianceTextures();
+    const ceiling = lampCeilingTexture();
+    const uniforms = {
+        lampIrrSide: { value: side }, lampIrrVert: { value: vert }, lampCeiling: { value: ceiling.tex },
+    };
+    const f = (v) => v.toFixed(3);
+    THREE.MeshStandardMaterial.prototype.onBeforeCompile = function (shader) {
+        Object.assign(shader.uniforms, uniforms);
+        shader.vertexShader = shader.vertexShader
+            .replace("#include <common>", "#include <common>\nvarying vec3 vLampWorld;")
+            .replace("#include <project_vertex>", `#include <project_vertex>
+vec4 lampWorld = vec4(transformed, 1.0);
+#ifdef USE_INSTANCING
+lampWorld = instanceMatrix * lampWorld;
+#endif
+vLampWorld = (modelMatrix * lampWorld).xyz;`);
+        shader.fragmentShader = shader.fragmentShader
+            .replace("#include <common>", `#include <common>
+varying vec3 vLampWorld;
+uniform sampler2D lampIrrSide;
+uniform sampler2D lampIrrVert;
+uniform sampler2D lampCeiling;`)
+            .replace("#include <lights_fragment_maps>", `#include <lights_fragment_maps>
+{
+    vec3 wn = inverseTransformDirection(geometry.normal, viewMatrix);
+    vec2 luv = (vLampWorld.xy - vec2(${f(IRR_X0)}, ${f(IRR_Y0)})) / vec2(${f(IRR_W)}, ${f(IRR_H)});
+    vec4 s = texture2D(lampIrrSide, luv);
+    vec2 v = texture2D(lampIrrVert, luv).rg;
+    vec3 n2 = wn * wn;
+    irradiance += ${f(IRR_MAX)} * (n2.x * (wn.x > 0.0 ? s.r : s.g)
+        + n2.y * (wn.y > 0.0 ? s.b : s.a) + n2.z * (wn.z > 0.0 ? v.r : v.g));
+    // Diffuse-only fill from the old second sun at (0, -1, 1); its highlight never faced the home camera.
+    irradiance += vec3(${f(FILL_I)} * max(dot(wn, vec3(0.0, ${f(-Math.SQRT1_2)}, ${f(Math.SQRT1_2)})), 0.0));
+    vec3 rd = reflect(normalize(vLampWorld - cameraPosition), wn);
+    if (rd.z > 0.01) {
+        float t = (${f(LAMP_Z)} - vLampWorld.z) / rd.z;
+        vec2 cuv = (vLampWorld.xy + rd.xy * t) / vec2(${f(CEIL_W)}, ${f(CEIL_H)}) + 0.5;
+        // GGX lobe on the ceiling spans about 4 * alpha * t; one mip texel covers it.
+        float a = material.roughness * material.roughness;
+        float lod = log2(max(4.0 * a * t * ${f(CEIL_PX)}, 1.0));
+        // Disc radiance that gives the PointLight's I / t through its solid angle.
+        radiance += texture2DLodEXT(lampCeiling, cuv, lod).r
+            * ${f(LAMP_CD / ceiling.area)} * t / rd.z;
+    }
+}`);
+    };
+}
+
+const SUN_I = 0.8;
+const FILL_I = 0.8;
+
+function renderLights() {
+    // Mirrors into the ice near centre ice from the home camera.
+    const sun = new THREE.DirectionalLight(0xffffff, SUN_I);
+    sun.position.set(0, 100, 100);
+    scene.add(sun);
+    // The former AmbientLight(0.4) plus HemisphereLight(white, 0xb4d4ff, 0.3) in one light.
+    const ground = new THREE.Color(0xb4d4ff).multiplyScalar(0.3).addScalar(0.4);
+    scene.add(new THREE.HemisphereLight(new THREE.Color(0.7, 0.7, 0.7), ground, 1));
 }

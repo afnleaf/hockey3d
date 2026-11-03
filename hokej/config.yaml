@@ -10,8 +10,7 @@ pack:
   css:
     - https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css
   scripts:
-    - https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js
-    - https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/TrackballControls.min.js
+    - ./public/three.js
     - ./public/data.js
     - ./public/arena.js
     - ./public/script.js

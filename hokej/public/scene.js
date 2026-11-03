@@ -1,5 +1,5 @@
-// Renderer, camera, controls and the render loop. THREE and
-// THREE.TrackballControls come from the classic CDN scripts in index.html.
+// Renderer, camera, controls and the render loop. THREE is the
+// global set by three_global.js.
 
 const CAMERA_HOME = [0, -75, 75];
 

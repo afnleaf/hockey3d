@@ -301,12 +301,12 @@ async fn oversized_upstream_body_is_502_and_not_cached() {
 }
 
 #[tokio::test]
-async fn public_mode_drops_index_and_null_origin() {
+async fn public_mode_drops_index_keeps_null_origin() {
     let (relay, _h, d) = setup_with("OFF", |c| c.public = true).await;
     std::fs::write(d.path().join("index.html"), "<p>x</p>").unwrap();
     assert_eq!(reqwest::get(format!("{relay}/")).await.unwrap().status(), 404);
     let url = format!("{relay}/v1/gamecenter/2026020224/play-by-play");
-    assert_eq!(client().get(&url).header("Origin", "null").send().await.unwrap().status(), 403);
+    assert_eq!(client().get(&url).header("Origin", "null").send().await.unwrap().status(), 200);
     let r = client().get(&url).header("Origin", ORIGIN).send().await.unwrap();
     assert_eq!(r.status(), 200);
 }

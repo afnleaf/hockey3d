@@ -28,6 +28,8 @@ Cargo.lock
 hokej/public/data.js
 hokej/.pack
 hokej/public/icon_glyphs.js
+hokej/public/three.js
+hokej/node_modules
 
 reference/arena_reference.jpg
 .DS_Store

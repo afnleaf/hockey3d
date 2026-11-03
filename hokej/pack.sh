@@ -7,7 +7,9 @@ cd "$(dirname "$0")"
 # Empty means same origin as the page (relay serves it), or 127.0.0.1:8790 from file://.
 relay_base="${RELAY_BASE:-}"
 mkdir -p .pack ../output
+bun install --frozen-lockfile
 bun build_icons.ts
+bun build three_global.js --format iife --minify --outfile .pack/three.js
 bun build public/app.js --outfile .pack/bundle.js \
   --define "__RELAY_BASE__=\"$relay_base\""
 histos histos.yaml -o ../output/index.html

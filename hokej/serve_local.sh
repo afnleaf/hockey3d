@@ -8,7 +8,9 @@ here="$(cd "$(dirname "$0")" && pwd)"
 relay_dir="$here/../nhl_record_relay"
 
 cargo build --release --manifest-path "$relay_dir/Cargo.toml"
+bun install --cwd "$here" --frozen-lockfile
 bun "$here/build_icons.ts"
+bun build "$here/three_global.js" --format iife --minify --outfile "$here/public/three.js"
 
 export RELAY_ALLOWED_ORIGINS="${RELAY_ALLOWED_ORIGINS:-http://localhost:8000,null,https://chetgdp.github.io,https://afnleaf.github.io}"
 export RELAY_CACHE_DIR="${RELAY_CACHE_DIR:-$relay_dir/cache}"

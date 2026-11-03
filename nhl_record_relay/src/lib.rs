@@ -379,9 +379,6 @@ async fn logo(State(r): State<Arc<Relay>>, Path(file): Path<String>) -> Response
 
 pub fn app(mut cfg: Config) -> Router {
     std::fs::create_dir_all(&cfg.cache_dir).expect("cache dir");
-    if cfg.public {
-        cfg.allowed_origins.retain(|o| o != "null");
-    }
     let origins: Vec<HeaderValue> =
         cfg.allowed_origins.iter().map(|o| o.parse().expect("allowed origin")).collect();
     let cors = CorsLayer::new()

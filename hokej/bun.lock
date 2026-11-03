@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "hokej",
+      "dependencies": {
+        "three": "0.132.2",
+      },
+    },
+  },
+  "packages": {
+    "three": ["three@0.132.2", "", {}, "sha512-0wcR7LxxkXMn6Gi58gEs3QvY8WpTVXA31L2VOvpjm4ZPYFRHCZC13UqynheFoS5OXDYgtBneN0dhbaNBE8iLhQ=="],
+  }
+}
