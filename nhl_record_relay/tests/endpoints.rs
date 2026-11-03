@@ -24,6 +24,13 @@ async fn fetch(url: String) -> reqwest::Result<reqwest::Response> {
 }
 
 async fn setup(state: &'static str) -> (String, Arc<AtomicUsize>, tempfile::TempDir) {
+    setup_with(state, |_| {}).await
+}
+
+async fn setup_with(
+    state: &'static str,
+    tweak: impl FnOnce(&mut nhl_record_relay::Config),
+) -> (String, Arc<AtomicUsize>, tempfile::TempDir) {
     let hits = Arc::new(AtomicUsize::new(0));
     let h = hits.clone();
     let h2 = hits.clone();
@@ -32,9 +39,14 @@ async fn setup(state: &'static str) -> (String, Arc<AtomicUsize>, tempfile::Temp
         Router::new()
             .route(
                 "/v1/gamecenter/{id}/play-by-play",
-                get(move || {
+                get(move |axum::extract::Path(id): axum::extract::Path<String>| {
                     h.fetch_add(1, Ordering::SeqCst);
-                    async move { format!(r#"{{"gameState":"{state}","plays":[]}}"#) }
+                    async move {
+                        if id == "2026029999" {
+                            return "x".repeat(9 * 1024 * 1024);
+                        }
+                        format!(r#"{{"gameState":"{state}","plays":[]}}"#)
+                    }
                 }),
             )
             .route(
@@ -61,15 +73,19 @@ async fn setup(state: &'static str) -> (String, Arc<AtomicUsize>, tempfile::Temp
     )
     .await;
     let dir = tempfile::tempdir().unwrap();
-    let relay = spawn(nhl_record_relay::app(nhl_record_relay::Config {
+    let mut cfg = nhl_record_relay::Config {
         cache_dir: dir.path().into(),
         allowed_origins: vec![ORIGIN.into(), "null".into()],
         web_base: upstream.clone(),
         stats_base: upstream.clone(),
         assets_base: upstream,
         index: Some(dir.path().join("index.html")),
-    }))
-    .await;
+        public: false,
+        rate_burst: 1000,
+        rate_per_sec: 1000.0,
+    };
+    tweak(&mut cfg);
+    let relay = spawn(nhl_record_relay::app(cfg)).await;
     (relay, hits, dir)
 }
 
@@ -83,6 +99,7 @@ async fn final_game_is_cached_and_cors_limited_to_origin() {
     assert_eq!(r.headers()["access-control-allow-origin"], ORIGIN);
     assert!(r.text().await.unwrap().contains("OFF"));
     let r = c.get(&url).header("Origin", "https://evil.example").send().await.unwrap();
+    assert_eq!(r.status(), 403);
     assert!(r.headers().get("access-control-allow-origin").is_none());
     assert_eq!(hits.load(Ordering::SeqCst), 1);
 }
@@ -243,4 +260,53 @@ async fn logo_rejects_bad_names_and_bad_upstream_bodies() {
         assert_eq!(r.status(), 502, "{name}");
         assert!(!d.path().join(format!("logo_{name}")).exists());
     }
+}
+
+#[tokio::test]
+async fn foreign_origin_is_403_on_logos_too() {
+    let (relay, hits, _d) = setup("OFF").await;
+    let r = reqwest::Client::new()
+        .get(format!("{relay}/logo/TOR_dark.svg"))
+        .header("Origin", "https://evil.example")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 403);
+    assert_eq!(hits.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn rate_limit_is_per_client_ip() {
+    let (relay, _h, _d) = setup_with("OFF", |c| {
+        c.rate_burst = 3;
+        c.rate_per_sec = 0.001;
+    })
+    .await;
+    let url = format!("{relay}/v1/gamecenter/2026020224/play-by-play");
+    let c = client();
+    let get = |ip: &'static str| c.get(&url).header("CF-Connecting-IP", ip).send();
+    for _ in 0..3 {
+        assert_eq!(get("203.0.113.1").await.unwrap().status(), 200);
+    }
+    assert_eq!(get("203.0.113.1").await.unwrap().status(), 429);
+    assert_eq!(get("203.0.113.2").await.unwrap().status(), 200);
+}
+
+#[tokio::test]
+async fn oversized_upstream_body_is_502_and_not_cached() {
+    let (relay, _h, d) = setup("OFF").await;
+    let r = fetch(format!("{relay}/v1/gamecenter/2026029999/play-by-play")).await.unwrap();
+    assert_eq!(r.status(), 502);
+    assert!(!d.path().join("pbp_2026029999.json").exists());
+}
+
+#[tokio::test]
+async fn public_mode_drops_index_and_null_origin() {
+    let (relay, _h, d) = setup_with("OFF", |c| c.public = true).await;
+    std::fs::write(d.path().join("index.html"), "<p>x</p>").unwrap();
+    assert_eq!(reqwest::get(format!("{relay}/")).await.unwrap().status(), 404);
+    let url = format!("{relay}/v1/gamecenter/2026020224/play-by-play");
+    assert_eq!(client().get(&url).header("Origin", "null").send().await.unwrap().status(), 403);
+    let r = client().get(&url).header("Origin", ORIGIN).send().await.unwrap();
+    assert_eq!(r.status(), 200);
 }

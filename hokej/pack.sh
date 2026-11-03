@@ -4,7 +4,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-relay_base="${RELAY_BASE:-http://127.0.0.1:8790}"
+# Empty means same origin as the page (relay serves it), or 127.0.0.1:8790 from file://.
+relay_base="${RELAY_BASE:-}"
 mkdir -p .pack ../output
 bun build_icons.ts
 bun build public/app.js --outfile .pack/bundle.js \

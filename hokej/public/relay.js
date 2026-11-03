@@ -5,11 +5,10 @@
 export const RELAY_BASE = (() => {
     const fromHash = new URLSearchParams(location.hash.slice(1)).get("relay");
     if (fromHash) sessionStorage.setItem("relay", fromHash);
-    const packed = typeof __RELAY_BASE__ !== "undefined";
+    if (typeof __RELAY_BASE__ === "undefined") return sessionStorage.getItem("relay") ?? "http://127.0.0.1:8790";
     const served = location.protocol === "http:" || location.protocol === "https:";
     return sessionStorage.getItem("relay")
-        ?? (packed && served ? location.origin
-            : packed ? __RELAY_BASE__ : "http://127.0.0.1:8790");
+        ?? (__RELAY_BASE__ || (served ? location.origin : "http://127.0.0.1:8790"));
 })();
 
 // NHL logo URLs carry a "?season=" suffix on some feeds; the file name alone

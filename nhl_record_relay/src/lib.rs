@@ -10,10 +10,12 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    net::{IpAddr, SocketAddr},
     path::PathBuf,
     sync::{Arc, Mutex},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+use tokio::sync::Semaphore;
 use tower_http::cors::CorsLayer;
 
 // Live games change every few seconds; a short window keeps one upstream
@@ -30,6 +32,15 @@ const FREEZE_AFTER: u64 = 7 * 86400;
 pub const APP_HEADER: &str = "x-histos-app";
 pub const APP_NAME: &str = "hokej";
 
+// Largest real record (shift charts) is about 1 MB; the cap bounds memory and
+// disk if upstream misbehaves.
+const BODY_MAX: usize = 8 * 1024 * 1024;
+// NHL API politeness and a ceiling on open sockets from one relay.
+const UPSTREAM_PARALLEL: usize = 8;
+const INFLIGHT_MAX: usize = 64;
+// Pruned past this size so spoofed client IPs cannot grow the table unbounded.
+const BUCKETS_MAX: usize = 10_000;
+
 pub struct Config {
     pub cache_dir: PathBuf,
     pub allowed_origins: Vec<String>,
@@ -37,6 +48,10 @@ pub struct Config {
     pub stats_base: String,
     pub assets_base: String,
     pub index: Option<PathBuf>,
+    /// Behind a public tunnel: no page at `/`, no `Origin: null`.
+    pub public: bool,
+    pub rate_burst: u32,
+    pub rate_per_sec: f64,
 }
 
 #[derive(Clone, Copy)]
@@ -68,6 +83,9 @@ struct Relay {
     cfg: Config,
     http: reqwest::Client,
     locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
+    upstream_slots: Semaphore,
+    inflight: Semaphore,
+    buckets: Mutex<HashMap<IpAddr, (f64, Instant)>>,
 }
 
 fn now() -> u64 {
@@ -162,11 +180,19 @@ impl Relay {
         }
 
         let fetched = async {
-            let r = self.http.get(self.upstream(kind, id)).send().await.ok()?;
-            if !r.status().is_success() {
+            let _slot = self.upstream_slots.acquire().await.ok()?;
+            let mut r = self.http.get(self.upstream(kind, id)).send().await.ok()?;
+            if !r.status().is_success() || r.content_length().is_some_and(|n| n as usize > BODY_MAX) {
                 return None;
             }
-            r.bytes().await.ok()
+            let mut body = Vec::new();
+            while let Some(chunk) = r.chunk().await.ok()? {
+                if body.len() + chunk.len() > BODY_MAX {
+                    return None;
+                }
+                body.extend_from_slice(&chunk);
+            }
+            Some(body)
         }
         .await;
 
@@ -187,7 +213,7 @@ impl Relay {
         {
             let _ = tokio::fs::write(&meta_path, serde_json::to_vec(&new_meta).unwrap()).await;
         }
-        Ok(body.to_vec())
+        Ok(body)
     }
 }
 
@@ -211,6 +237,56 @@ async fn require_app(req: Request, next: Next) -> Response {
     } else {
         StatusCode::FORBIDDEN.into_response()
     }
+}
+
+// cloudflared connects from loopback, so only then is its client-IP header
+// trusted; a direct remote peer is keyed by its socket address.
+fn client_ip(req: &Request) -> IpAddr {
+    let peer = req.extensions().get::<axum::extract::ConnectInfo<SocketAddr>>().map(|c| c.0.ip());
+    match peer {
+        Some(ip) if !ip.is_loopback() => ip,
+        _ => req
+            .headers()
+            .get("cf-connecting-ip")
+            .and_then(|v| v.to_str().ok()?.parse().ok())
+            .unwrap_or(IpAddr::from([127, 0, 0, 1])),
+    }
+}
+
+impl Relay {
+    fn take_token(&self, ip: IpAddr) -> bool {
+        let (burst, rate) = (self.cfg.rate_burst as f64, self.cfg.rate_per_sec);
+        let t = Instant::now();
+        let mut b = self.buckets.lock().unwrap();
+        if b.len() >= BUCKETS_MAX {
+            b.retain(|_, (tokens, at)| *tokens + t.duration_since(*at).as_secs_f64() * rate < burst);
+        }
+        let (tokens, at) = b.entry(ip).or_insert((burst, t));
+        *tokens = (*tokens + t.duration_since(*at).as_secs_f64() * rate).min(burst);
+        *at = t;
+        if *tokens < 1.0 {
+            return false;
+        }
+        *tokens -= 1.0;
+        true
+    }
+}
+
+// CORS alone only hides responses from foreign pages; this stops their
+// requests from costing upstream fetches or rate budget.
+async fn guard(State(r): State<Arc<Relay>>, req: Request, next: Next) -> Response {
+    let Ok(_slot) = r.inflight.try_acquire() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    if !r.take_token(client_ip(&req)) {
+        return StatusCode::TOO_MANY_REQUESTS.into_response();
+    }
+    if let Some(o) = req.headers().get(header::ORIGIN) {
+        if !r.cfg.allowed_origins.iter().any(|a| o == a.as_str()) {
+            return StatusCode::FORBIDDEN.into_response();
+        }
+    }
+    next.run(req).await
 }
 
 // Read per request so a repack shows up without a relay restart.
@@ -301,8 +377,11 @@ async fn logo(State(r): State<Arc<Relay>>, Path(file): Path<String>) -> Response
         .into_response()
 }
 
-pub fn app(cfg: Config) -> Router {
+pub fn app(mut cfg: Config) -> Router {
     std::fs::create_dir_all(&cfg.cache_dir).expect("cache dir");
+    if cfg.public {
+        cfg.allowed_origins.retain(|o| o != "null");
+    }
     let origins: Vec<HeaderValue> =
         cfg.allowed_origins.iter().map(|o| o.parse().expect("allowed origin")).collect();
     let cors = CorsLayer::new()
@@ -310,6 +389,7 @@ pub fn app(cfg: Config) -> Router {
         .allow_methods([Method::GET])
         .allow_headers([HeaderName::from_static(APP_HEADER)])
         .max_age(Duration::from_secs(86400));
+    let public = cfg.public;
     let relay = Arc::new(Relay {
         cfg,
         http: reqwest::Client::builder()
@@ -318,8 +398,11 @@ pub fn app(cfg: Config) -> Router {
             .build()
             .unwrap(),
         locks: Mutex::default(),
+        upstream_slots: Semaphore::new(UPSTREAM_PARALLEL),
+        inflight: Semaphore::new(INFLIGHT_MAX),
+        buckets: Mutex::default(),
     });
-    Router::new()
+    let router = Router::new()
         .route(
             "/v1/gamecenter/{id}/play-by-play",
             get(|State(r): State<Arc<Relay>>, Path(id): Path<String>| serve(r, Kind::PlayByPlay, id)),
@@ -340,8 +423,10 @@ pub fn app(cfg: Config) -> Router {
         .route("/logo/{file}", get(logo))
         // Outermost, so preflights are answered before the app header check,
         // and logos get CORS headers for untainted WebGL textures.
-        .layer(cors)
-        // Added after the gate: a browser navigation cannot send the app header.
-        .route("/", get(index))
+        .layer(cors);
+    // Added after the gate: a browser navigation cannot send the app header.
+    let router = if public { router } else { router.route("/", get(index)) };
+    router
+        .layer(middleware::from_fn_with_state(relay.clone(), guard))
         .with_state(relay)
 }

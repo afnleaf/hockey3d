@@ -1,12 +1,14 @@
 # hokej task list
 
 - [x] better arena render https://www.scotiabankarena.com/assets/img/live-tsp-240926-venueshots-banners-1949-3-595420d67e.jpg
+- [] optimize shaders and make it lightweight graphically
 - [] arena stands
 - [] rulebook changes respect the year 2009 to present
 - [] HUD UX is so llm slop
 - [] proper camera ux (how to move around and set views)
 - [] heats maps
 - [] study other hockey statistics websites
+- [] probably move to a cloudflare worker
 - [] 3d models acting out the events with proper numbers and animations
 - [] sounds per event
 - [] 3d engine change out of three.js prototype (raylib?)

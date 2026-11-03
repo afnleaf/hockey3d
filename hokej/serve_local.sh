@@ -10,7 +10,7 @@ relay_dir="$here/../nhl_record_relay"
 cargo build --release --manifest-path "$relay_dir/Cargo.toml"
 bun "$here/build_icons.ts"
 
-export RELAY_ALLOWED_ORIGINS="http://localhost:8000,null"
+export RELAY_ALLOWED_ORIGINS="${RELAY_ALLOWED_ORIGINS:-http://localhost:8000,null,https://chetgdp.github.io,https://afnleaf.github.io}"
 export RELAY_CACHE_DIR="${RELAY_CACHE_DIR:-$relay_dir/cache}"
 export RELAY_INDEX="${RELAY_INDEX:-$here/../output/index.html}"
 
