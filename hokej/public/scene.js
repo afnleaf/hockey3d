@@ -48,6 +48,20 @@ function renderTools() {
     scene.add(new THREE.AxesHelper(500));
 }
 
+// Exposed so headless probes can read renderer.info.
+window.__renderer = renderer;
+
+const stats = new THREE.Stats();
+const triPanel = stats.addPanel(new THREE.Stats.Panel("ktri", "#ff8", "#221"));
+const drawPanel = stats.addPanel(new THREE.Stats.Panel("draws", "#f8f", "#212"));
+Object.assign(stats.dom.style, {
+    zIndex: "3000", left: "auto", right: "0", top: "0",
+    display: "flex", opacity: "0.8",
+});
+// Reduced canvases in one row keep the panel above the HUD cards.
+for (const c of stats.dom.children) Object.assign(c.style, { width: "60px", height: "36px" });
+document.body.appendChild(stats.dom);
+
 const frameHooks = [];
 
 // fn(nowMs) runs once per animation frame before rendering.
@@ -60,6 +74,9 @@ function animate(now) {
     for (const fn of frameHooks) fn(now);
     controls.update();
     renderer.render(scene, camera);
+    triPanel.update(renderer.info.render.triangles / 1000, 500);
+    drawPanel.update(renderer.info.render.calls, 2000);
+    stats.update();
 }
 
 window.addEventListener("resize", () => {

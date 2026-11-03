@@ -377,7 +377,7 @@ async fn logo(State(r): State<Arc<Relay>>, Path(file): Path<String>) -> Response
         .into_response()
 }
 
-pub fn app(mut cfg: Config) -> Router {
+pub fn app(cfg: Config) -> Router {
     std::fs::create_dir_all(&cfg.cache_dir).expect("cache dir");
     let origins: Vec<HeaderValue> =
         cfg.allowed_origins.iter().map(|o| o.parse().expect("allowed origin")).collect();

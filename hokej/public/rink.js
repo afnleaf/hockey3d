@@ -10,6 +10,8 @@ export function renderRink() {
     renderLines();
     renderNets();
     mergeStatic(scene.children.filter((o) => !before.has(o)));
+    // After the merge: its key ignores vertexColors, so the riser mesh must not join a batch.
+    renderStands();
     renderLights();
     renderGoalLights();
 }
@@ -320,6 +322,156 @@ function renderBenches() {
 export function setBenchColors(home, away) {
     if (benchStrips[0]) benchStrips[0].color.set(home);
     if (benchStrips[1]) benchStrips[1].color.set(away);
+}
+
+// Lower bowl only. Depths are from the outside of the boards; the sides start
+// farther back and higher so the first row clears the bench and penalty box walls.
+const STAND_ROWS = 20;
+const ROW_D = 33 / 12;
+const ROW_RISE = 16 / 12;
+const CONCOURSE = 6;
+const SIDE_BACK = BENCH_DEPTH + 0.5;
+const END_Z0 = 2;
+const SIDE_Z0 = BOARD_H + FRAME_H + 0.5;
+const SEAT_W = 1.75;
+const AISLE_W = 3.5;
+// Arcs are tessellated per row with the same angles so row edges stay concentric.
+const ARC_SEGS = 8;
+
+// Points of a row edge at depth d, CCW, with inward normal n and side weight w
+// (1 on the long sides, 0 at the ends, blended on the corner arcs).
+function standOutline(d) {
+    const r = CORNER_R + BOARD_T + d;
+    const sx = RINK_W / 2 - CORNER_R, sy = RINK_H / 2 - CORNER_R + SIDE_BACK;
+    const pts = [];
+    for (const [cx, cy, t0] of [[sx, -sy, -Math.PI / 2], [sx, sy, 0], [-sx, sy, Math.PI / 2], [-sx, -sy, Math.PI]]) {
+        for (let i = 0; i <= ARC_SEGS; i++) {
+            const t = t0 + Math.PI / 2 * i / ARC_SEGS;
+            const c = Math.cos(t), s = Math.sin(t);
+            pts.push({ x: cx + r * c, y: cy + r * s, nx: -c, ny: -s, w: s * s, t });
+        }
+    }
+    return pts;
+}
+
+function standZ(row, w) {
+    return END_Z0 + (SIDE_Z0 - END_Z0) * w + row * ROW_RISE;
+}
+
+function renderStands() {
+    const pos = [], col = [];
+    const tread = new THREE.Color(0x5a595c), face = new THREE.Color(0x2e2f33);
+    const quad = (a, b, c, d, color) => {
+        pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+        for (let i = 0; i < 6; i++) col.push(color.r, color.g, color.b);
+    };
+    // Vertical face between two heights along one outline, facing the ice.
+    const wall = (o, z0, z1) => {
+        for (let k = 0; k < o.length; k++) {
+            const p = o[k], q = o[(k + 1) % o.length];
+            if (Math.hypot(q.x - p.x, q.y - p.y) < 1e-6) continue;
+            quad([q.x, q.y, z0(q)], [p.x, p.y, z0(p)], [p.x, p.y, z1(p)], [q.x, q.y, z1(q)], face);
+        }
+    };
+    const dz = (row) => (p) => standZ(row, p.w);
+    for (let row = 0; row < STAND_ROWS; row++) {
+        const f = standOutline(CONCOURSE + row * ROW_D), b = standOutline(CONCOURSE + (row + 1) * ROW_D);
+        wall(f, row ? dz(row - 1) : () => 0, dz(row));
+        for (let k = 0; k < f.length; k++) {
+            const k1 = (k + 1) % f.length;
+            const z0 = standZ(row, f[k].w), z1 = standZ(row, f[k1].w);
+            quad([f[k].x, f[k].y, z0], [b[k].x, b[k].y, z0], [b[k1].x, b[k1].y, z1], [f[k1].x, f[k1].y, z1], tread);
+        }
+    }
+    const top = standOutline(CONCOURSE + STAND_ROWS * ROW_D);
+    wall(top, dz(STAND_ROWS - 1), (p) => standZ(STAND_ROWS - 1, p.w) + 3.5);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    // Lambert, not the lamp-patched Standard material: its ceiling reflection turns the
+    // tiers white at the grazing angles seen from ice level. Per-vertex shading also
+    // keeps ~7k seats cheap.
+    scene.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true })));
+    renderSeats();
+}
+
+// Reference photo: dark seats nearest the ice, then gold, then red.
+const SEAT_BANDS = [[8, 0x2a2c31], [15, 0xb07a1c], [STAND_ROWS, 0x8e1520]];
+
+function seatGeometry() {
+    // +y faces the ice, origin on the tread under the seat centre; front faces only,
+    // the sides touch the neighbours and the underside is never seen.
+    const hw = SEAT_W / 2 - 0.08;
+    const pan = 1.5, front = 0.7, rear = -0.75, backTop = 2.9, backRear = -0.9;
+    const q = [
+        [[front, pan - 0.35], [front, pan]],
+        [[front, pan], [rear, pan]],
+        [[rear, pan], [rear + 0.05, backTop]],
+        [[rear + 0.05, backTop], [backRear, backTop]],
+        [[backRear, backTop], [backRear + 0.05, pan - 0.2]],
+    ];
+    const pos = [];
+    for (const [[y0, z0], [y1, z1]] of q) {
+        pos.push(hw, y0, z0, -hw, y0, z0, -hw, y1, z1, hw, y0, z0, -hw, y1, z1, hw, y1, z1);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    return geo;
+}
+
+function renderSeats() {
+    const seats = [];
+    for (let row = 0; row < STAND_ROWS; row++) {
+        const o = standOutline(CONCOURSE + row * ROW_D + 1.6);
+        // Aisles sit at fixed angles on the arcs and fixed x/y on the straights,
+        // so they line up row to row like stairs.
+        for (let k = 0; k < o.length; k++) {
+            const p = o[k], q = o[(k + 1) % o.length];
+            const len = Math.hypot(q.x - p.x, q.y - p.y);
+            if (len < 1e-6) continue;
+            const onArc = k % (ARC_SEGS + 1) !== ARC_SEGS;
+            const segs = onArc ? [[0, len]] : straightBlocks(len);
+            for (const [s0, s1] of segs) {
+                const a = s0 + (onArc && k % (ARC_SEGS + 1) % 2 === 0 ? AISLE_W / 2 : 0);
+                const b = s1 - (onArc && k % (ARC_SEGS + 1) % 2 === 1 ? AISLE_W / 2 : 0);
+                const n = Math.floor((b - a) / SEAT_W);
+                const pad = (b - a - n * SEAT_W) / 2;
+                for (let i = 0; i < n; i++) {
+                    const u = (a + pad + (i + 0.5) * SEAT_W) / len;
+                    const w = p.w + (q.w - p.w) * u;
+                    const nx = p.nx + (q.nx - p.nx) * u, ny = p.ny + (q.ny - p.ny) * u;
+                    seats.push([p.x + (q.x - p.x) * u, p.y + (q.y - p.y) * u, standZ(row, w),
+                        Math.atan2(-nx, ny), row]);
+                }
+            }
+        }
+    }
+    const mat = new THREE.MeshLambertMaterial();
+    const inst = new THREE.InstancedMesh(seatGeometry(), mat, seats.length);
+    const m = new THREE.Matrix4(), c = new THREE.Color();
+    seats.forEach(([x, y, z, ang, row], i) => {
+        m.makeRotationZ(ang).setPosition(x, y, z);
+        inst.setMatrixAt(i, m);
+        const band = SEAT_BANDS.find(([last]) => row < last)[1];
+        // Small per-seat jitter so a band does not read as one flat sheet.
+        c.set(band).multiplyScalar(0.92 + 0.16 * ((i * 2654435761) % 1000) / 1000);
+        inst.setColorAt(i, c);
+    });
+    // Instance bounds span the bowl but three r132 culls on the single seat's bounds.
+    inst.frustumCulled = false;
+    scene.add(inst);
+}
+
+// Straight runs split into blocks with an aisle between each pair.
+function straightBlocks(len) {
+    const k = Math.max(1, Math.round(len / 36));
+    const step = len / k, out = [];
+    for (let i = 0; i < k; i++) {
+        out.push([i * step + (i ? AISLE_W / 2 : 0), (i + 1) * step - (i < k - 1 ? AISLE_W / 2 : 0)]);
+    }
+    return out;
 }
 
 const BOX_SEATS = 3;
