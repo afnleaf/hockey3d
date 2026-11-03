@@ -44,7 +44,7 @@ export const teamColors = {
 };
 
 const NEUTRAL = 0x888888;
-const ANIM_MS = 900;
+const ANIM_MS = 500;
 const GOAL_LINE_X = 89;
 const ICON_SIZE = { 505: 8, 506: 5.8, 507: 5, 508: 5, 509: 6.2 };
 const DEFAULT_ICON_SIZE = 4.8;
@@ -241,26 +241,73 @@ function shotArc(entry, e, side, x, y, color) {
     g.add(tube);
     // arc lives in world space; the group is offset back by the origin
     g.position.set(-x, -y, 0);
-    const tip = new THREE.Mesh(new THREE.SphereGeometry(radius * 2.2, 12, 8),
-        track(entry, new THREE.MeshBasicMaterial({ color: 0x111111,
-            opacity: 1 })));
+    // 4x regulation (3 in x 1 in) so it reads at default camera distance.
+    const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1 / 3, 24),
+        track(entry, new THREE.MeshStandardMaterial({ color: 0x111111,
+            roughness: 0.8 })));
+    tip.rotation.x = Math.PI / 2;
     tip.position.copy(end);
     g.add(tip);
-    if (e.typeCode === 505) {
-        const gm = track(entry, new THREE.SpriteMaterial({
-            map: glowTexture(), color: 0xffd040,
-            blending: THREE.AdditiveBlending, depthWrite: false }), 1);
-        const glow = new THREE.Sprite(gm);
-        glow.scale.set(12, 12, 1);
-        glow.position.copy(end);
-        g.add(glow);
-    }
+    const beacon = e.typeCode === 505 ? goalLight(entry, end) : null;
+    if (beacon) g.add(beacon.object);
     const total = geom.index.count;
     return {
         object: g,
-        step(p) {
+        step(p, elapsed) {
             geom.setDrawRange(0, Math.ceil(total * p / 3) * 3);
             tip.position.copy(curve.getPoint(Math.max(0.001, p)));
+            if (beacon) beacon.update(elapsed - ANIM_MS);
+        },
+    };
+}
+
+const GOAL_LIGHT_MS = 3000;
+const BEACON_REV_PER_S = 1.5;
+
+// Daktronics NHL unit: rink.js draws the static housing; this lights its two
+// red beacons. The green lamp is the period-end signal, so a goal keeps it dark.
+function goalLight(entry, end) {
+    const g = new THREE.Group();
+    const dir = Math.sign(end.x) || 1;
+    g.position.set(dir * 96, 0, 9);
+    const dome = (y, color) => {
+        const m = track(entry, new THREE.MeshStandardMaterial({ color,
+            emissive: color, emissiveIntensity: 0, roughness: 0.3,
+            transparent: true, opacity: 0.85 }));
+        // Slightly larger than the static dome so it covers it without z-fighting.
+        const d = new THREE.Mesh(
+            new THREE.SphereGeometry(0.37, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), m);
+        d.rotation.x = Math.PI / 2;
+        d.position.set(0, y, 0.25);
+        d.visible = false;
+        g.add(d);
+        return d;
+    };
+    const reds = [dome(-0.75, 0xd01010), dome(0.75, 0xd01010)];
+    const flashes = [-0.75, 0.75].map((y) => {
+        const s = new THREE.Sprite(track(entry, new THREE.SpriteMaterial({
+            map: glowTexture(), color: 0xff2010,
+            blending: THREE.AdditiveBlending, depthWrite: false }), 1));
+        s.scale.set(10, 10, 1);
+        s.position.set(0, y, 0.5);
+        s.visible = false;
+        g.add(s);
+        return s;
+    });
+    return {
+        object: g,
+        update(sinceArrival) {
+            const on = sinceArrival >= 0 && sinceArrival < GOAL_LIGHT_MS;
+            const turn = on ? sinceArrival / 1000 * BEACON_REV_PER_S * Math.PI * 2 : 0;
+            for (let i = 0; i < 2; i++) {
+                // Rotating reflector: bright only while the beam faces the camera side.
+                // Additive blend, so colour scales brightness; setOpacity owns opacity.
+                const facing = on ? Math.max(0, Math.cos(turn + i * Math.PI)) ** 4 : 0;
+                reds[i].visible = on;
+                reds[i].material.emissiveIntensity = 0.6 + 2 * facing;
+                flashes[i].material.color.setRGB(facing, 0.12 * facing, 0.06 * facing);
+                flashes[i].visible = facing > 0.01;
+            }
         },
     };
 }
@@ -388,6 +435,34 @@ export function loadEvents(game, colorMap) {
         scene.add(entry.group);
         rendered.push(entry);
     }
+    periodEnds = game.plays.filter((p) => p.type === "period-end" || p.type === "game-end")
+        .map((p) => p.gameSeconds);
+    greenSince = -Infinity;
+}
+
+// The green lamp signals the period clock reaching zero; both units light.
+let periodEnds = [];
+let greenSince = -Infinity;
+const greens = [-1, 1].map((dir) => {
+    const d = new THREE.Mesh(
+        new THREE.SphereGeometry(0.37, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+        new THREE.MeshStandardMaterial({ color: 0x10a030, emissive: 0x20ff50,
+            emissiveIntensity: 2, roughness: 0.3 }));
+    d.rotation.x = Math.PI / 2;
+    d.position.set(dir * 96, 0, 9.25);
+    d.visible = false;
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glowTexture(), color: 0x20ff50, opacity: 0.4,
+        blending: THREE.AdditiveBlending, depthWrite: false }));
+    glow.scale.set(7, 7, 1);
+    d.add(glow);
+    scene.add(d);
+    return d;
+});
+
+function updateGreens(t, stepping, now) {
+    if (stepping && periodEnds.some((s) => s > lastTime && s <= t)) greenSince = now;
+    else if (!stepping) greenSince = -Infinity;
 }
 
 function setOpacity(entry, f) {
@@ -430,6 +505,7 @@ export function applyVisibility(t, passes, showAll) {
             : RECENT_OPACITY[entry.rank] ?? 0;
         if (visible) n++;
     }
+    updateGreens(t, stepping, now);
     lastTime = t;
     updateFrame(now);
     return n;
@@ -457,10 +533,11 @@ export function setPinned(event) {
 }
 
 function updateFrame(now) {
+    for (const d of greens) d.visible = now - greenSince < GOAL_LIGHT_MS;
     for (const entry of rendered) {
         if (!entry.group.visible) continue;
         const p = Math.min(1, (now - entry.bornAt) / ANIM_MS);
-        if (entry.anim) entry.anim(1 - (1 - p) ** 3);
+        if (entry.anim) entry.anim(1 - (1 - p) ** 3, now - entry.bornAt);
         setOpacity(entry, entry.opacity);
     }
 }

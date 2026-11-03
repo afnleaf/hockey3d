@@ -1,23 +1,11 @@
 // Main page (daily game list) and visualizer routing.
 import { loadGame } from "./viz.js";
 import { pause } from "./timeline.js";
+import { RELAY_BASE, logoUrl } from "./relay.js";
 
 // Routes: "" = game list, "#date=YYYY-MM-DD" = list for a day,
 // "#game=ID" = visualizer.
 
-// The packed page served over http(s) comes from the relay itself, so it uses
-// its own origin; a cross-origin call to 127.0.0.1 would trigger Chrome's
-// Local Network Access prompt. file:// and the unbundled dev page (port 8000)
-// fall back to __RELAY_BASE__ from pack.sh. "#relay=URL" overrides per tab.
-const RELAY_BASE = (() => {
-    const fromHash = new URLSearchParams(location.hash.slice(1)).get("relay");
-    if (fromHash) sessionStorage.setItem("relay", fromHash);
-    const packed = typeof __RELAY_BASE__ !== "undefined";
-    const served = location.protocol === "http:" || location.protocol === "https:";
-    return sessionStorage.getItem("relay")
-        ?? (packed && served ? location.origin
-            : packed ? __RELAY_BASE__ : "http://127.0.0.1:8790");
-})();
 const GAME_ID_RE = /^(20090[2-9]|20[1-9]\d{3})\d{4}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // 2009-10 opening night; 2009 preseason feed has goals only
@@ -172,7 +160,7 @@ const FIRST_DAY = "2009-10-01";
         const parts = [abbrev];
         if (team.darkLogo) {
             const img = document.createElement("img");
-            img.src = team.darkLogo;
+            img.src = logoUrl(team.darkLogo);
             img.alt = "";
             side === "away" ? parts.unshift(img) : parts.push(img);
         }

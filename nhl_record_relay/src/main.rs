@@ -11,6 +11,7 @@ async fn main() {
             .collect(),
         web_base: var("RELAY_WEB_BASE").unwrap_or_else(|_| "https://api-web.nhle.com".into()),
         stats_base: var("RELAY_STATS_BASE").unwrap_or_else(|_| "https://api.nhle.com".into()),
+        assets_base: var("RELAY_ASSETS_BASE").unwrap_or_else(|_| "https://assets.nhle.com".into()),
         index: var("RELAY_INDEX").ok().map(Into::into),
     };
     let bind = var("RELAY_BIND").unwrap_or_else(|_| "127.0.0.1:8790".into());

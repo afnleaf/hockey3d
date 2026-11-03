@@ -1,7 +1,9 @@
 // Ties a parsed game to the scene and HUD: the scrub time and filters
 // decide which events show, the HUD state and the on-ice lists.
 import { parseGame, parseShifts, secondsToMmss } from "./parse.js";
-import { renderRink } from "./rink.js";
+import { renderRink, renderCenterLogo, setBenchColors, setPenaltyBoxOccupants }
+    from "./rink.js";
+import { logoUrl } from "./relay.js";
 import { loadEvents, applyVisibility, gameColors, pickEvent, setPinned }
     from "./events.js";
 import { renderer } from "./scene.js";
@@ -362,7 +364,12 @@ function onTime(t) {
     time = t;
     refreshEvents();
     setGameState(hudState(t));
-    renderShifts(t, boxedAt(t));
+    const boxed = boxedAt(t);
+    renderShifts(t, boxed);
+    setPenaltyBoxOccupants(boxed.map((b) => ({
+        box: b.teamId === game.home.id ? 0 : 1,
+        color: teamOf(b.teamId)?.color ?? "#888",
+        number: game.roster.get(b.playerId)?.number })));
 }
 
 // shiftJson may be null when the shiftcharts request failed.
@@ -373,8 +380,10 @@ export function loadGame(pbp, shiftJson, shiftError) {
         id: t.id,
         abbrev: t.abbrev,
         color: "#" + colors.get(t.id).toString(16).padStart(6, "0"),
-        logo: t.darkLogo,
+        logo: logoUrl(t.darkLogo),
     }));
+    renderCenterLogo(logoUrl(game.home.logo));
+    setBenchColors(teams[1].color, teams[0].color);
     penalties = buildPenalties();
     pinnedPlay = null;
     rinkTip.style.display = "none";

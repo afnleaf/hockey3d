@@ -17,7 +17,8 @@ renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 renderer.domElement.style.zIndex = "1";
 
-export const camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 10000);
+// Near plane sets depth precision; at 0.1 the 0.05ft gaps between ice layers z-fight.
+export const camera = new THREE.PerspectiveCamera(75, w / h, 1, 4000);
 camera.position.set(...CAMERA_HOME);
 camera.lookAt(0, 0, 0);
 camera.up.set(0, 0, 1);

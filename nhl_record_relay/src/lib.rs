@@ -35,6 +35,7 @@ pub struct Config {
     pub allowed_origins: Vec<String>,
     pub web_base: String,
     pub stats_base: String,
+    pub assets_base: String,
     pub index: Option<PathBuf>,
 }
 
@@ -223,6 +224,83 @@ async fn index(State(r): State<Arc<Relay>>) -> Response {
     }
 }
 
+// Bounds what an upstream mistake or hijack can push into the cache.
+const LOGO_MAX: usize = 512 * 1024;
+
+// NHL names: TOR_dark.svg, BOS_20082009-20222023_light.svg,
+// WSH_secondary_light.svg. Anything else never reaches upstream or disk.
+fn valid_logo(f: &str) -> bool {
+    let Some(stem) = f.strip_suffix(".svg") else { return false };
+    let Some(rest) = stem.strip_suffix("_dark").or_else(|| stem.strip_suffix("_light")) else {
+        return false;
+    };
+    let b = rest.as_bytes();
+    if b.len() < 3 || !b[..3].iter().all(u8::is_ascii_uppercase) {
+        return false;
+    }
+    match &rest[3..] {
+        "" | "_secondary" => true,
+        s => {
+            let s = s.as_bytes();
+            s.len() == 18
+                && s[0] == b'_'
+                && s[9] == b'-'
+                && s[1..9].iter().chain(&s[10..]).all(u8::is_ascii_digit)
+        }
+    }
+}
+
+// Logo files are versioned by name, so a cached copy never goes stale.
+// Outside the app-header gate: <img> and texture loads cannot send headers.
+async fn logo(State(r): State<Arc<Relay>>, Path(file): Path<String>) -> Response {
+    if !valid_logo(&file) {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let lock = r.locks.lock().unwrap().entry(format!("logo_{file}")).or_default().clone();
+    let _guard = lock.lock().await;
+    let path = r.cfg.cache_dir.join(format!("logo_{file}"));
+    let body = match tokio::fs::read(&path).await {
+        Ok(b) => b,
+        Err(_) => {
+            let fetched = async {
+                let url = format!("{}/logos/nhl/svg/{file}", r.cfg.assets_base);
+                let resp = r.http.get(url).send().await.ok()?;
+                let svg = resp.status().is_success()
+                    && resp
+                        .headers()
+                        .get(header::CONTENT_TYPE)
+                        .and_then(|v| v.to_str().ok())
+                        .is_some_and(|v| v.starts_with("image/svg+xml"));
+                if !svg || resp.content_length().is_some_and(|n| n as usize > LOGO_MAX) {
+                    return None;
+                }
+                let b = resp.bytes().await.ok()?;
+                (b.len() <= LOGO_MAX).then(|| b.to_vec())
+            }
+            .await;
+            let Some(b) = fetched else {
+                return StatusCode::BAD_GATEWAY.into_response();
+            };
+            let tmp = path.with_extension("tmp");
+            if tokio::fs::write(&tmp, &b).await.is_ok() {
+                let _ = tokio::fs::rename(&tmp, &path).await;
+            }
+            b
+        }
+    };
+    (
+        [
+            (header::CONTENT_TYPE, "image/svg+xml"),
+            // Opened directly, the SVG cannot run script against the relay origin.
+            (header::CONTENT_SECURITY_POLICY, "sandbox"),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+            (header::CACHE_CONTROL, "public, max-age=604800, immutable"),
+        ],
+        body,
+    )
+        .into_response()
+}
+
 pub fn app(cfg: Config) -> Router {
     std::fs::create_dir_all(&cfg.cache_dir).expect("cache dir");
     let origins: Vec<HeaderValue> =
@@ -258,8 +336,10 @@ pub fn app(cfg: Config) -> Router {
             "/v1/schedule/{date}",
             get(|State(r): State<Arc<Relay>>, Path(d): Path<String>| serve(r, Kind::Schedule, d)),
         )
-        .layer(middleware::from_fn(require_app))
-        // Outermost, so preflights are answered before the app header check.
+        .route_layer(middleware::from_fn(require_app))
+        .route("/logo/{file}", get(logo))
+        // Outermost, so preflights are answered before the app header check,
+        // and logos get CORS headers for untainted WebGL textures.
         .layer(cors)
         // Added after the gate: a browser navigation cannot send the app header.
         .route("/", get(index))

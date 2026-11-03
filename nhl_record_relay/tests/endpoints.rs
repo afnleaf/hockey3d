@@ -27,6 +27,7 @@ async fn setup(state: &'static str) -> (String, Arc<AtomicUsize>, tempfile::Temp
     let hits = Arc::new(AtomicUsize::new(0));
     let h = hits.clone();
     let h2 = hits.clone();
+    let h3 = hits.clone();
     let upstream = spawn(
         Router::new()
             .route(
@@ -42,6 +43,20 @@ async fn setup(state: &'static str) -> (String, Arc<AtomicUsize>, tempfile::Temp
                     h2.fetch_add(1, Ordering::SeqCst);
                     async move { format!(r#"{{"date":"{d}","gameWeek":[]}}"#) }
                 }),
+            )
+            .route(
+                "/logos/nhl/svg/{f}",
+                get(move |axum::extract::Path(f): axum::extract::Path<String>| {
+                    h3.fetch_add(1, Ordering::SeqCst);
+                    async move {
+                        let svg = "image/svg+xml";
+                        match f.as_str() {
+                            "HTM_dark.svg" => ([("content-type", "text/html")], "<svg/>".to_owned()),
+                            "BIG_dark.svg" => ([("content-type", svg)], "x".repeat(600 * 1024)),
+                            _ => ([("content-type", svg)], format!("<svg id=\"{f}\"/>")),
+                        }
+                    }
+                }),
             ),
     )
     .await;
@@ -50,7 +65,8 @@ async fn setup(state: &'static str) -> (String, Arc<AtomicUsize>, tempfile::Temp
         cache_dir: dir.path().into(),
         allowed_origins: vec![ORIGIN.into(), "null".into()],
         web_base: upstream.clone(),
-        stats_base: upstream,
+        stats_base: upstream.clone(),
+        assets_base: upstream,
         index: Some(dir.path().join("index.html")),
     }))
     .await;
@@ -188,4 +204,43 @@ async fn index_is_served_without_app_header_and_reread_per_request() {
     // The gate still covers the data routes.
     let r = reqwest::get(format!("{relay}/v1/gamecenter/2024020001/play-by-play")).await.unwrap();
     assert_eq!(r.status(), 403);
+}
+
+#[tokio::test]
+async fn logo_is_ungated_cached_and_cors_enabled() {
+    let (relay, hits, d) = setup("OFF").await;
+    for name in ["TOR_dark.svg", "BOS_20082009-20222023_light.svg", "WSH_secondary_light.svg"] {
+        let r = reqwest::Client::new()
+            .get(format!("{relay}/logo/{name}"))
+            .header("origin", "null")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(r.status(), 200, "{name}");
+        assert_eq!(r.headers()["content-type"], "image/svg+xml");
+        assert_eq!(r.headers()["content-security-policy"], "sandbox");
+        assert_eq!(r.headers()["access-control-allow-origin"], "null");
+        assert_eq!(r.text().await.unwrap(), format!("<svg id=\"{name}\"/>"));
+    }
+    let again = reqwest::get(format!("{relay}/logo/TOR_dark.svg")).await.unwrap();
+    assert_eq!(again.status(), 200);
+    assert_eq!(hits.load(Ordering::SeqCst), 3);
+    assert!(d.path().join("logo_TOR_dark.svg").exists());
+}
+
+#[tokio::test]
+async fn logo_rejects_bad_names_and_bad_upstream_bodies() {
+    let (relay, hits, d) = setup("OFF").await;
+    for name in ["tor_dark.svg", "TOR_dark.png", "TOR_blue.svg", "TORO_dark.svg",
+        "TOR_2008-2022_dark.svg", "..%2Fsecret_dark.svg", "TOR_dark.svg%3Fx"]
+    {
+        let r = reqwest::get(format!("{relay}/logo/{name}")).await.unwrap();
+        assert_eq!(r.status(), 404, "{name}");
+    }
+    assert_eq!(hits.load(Ordering::SeqCst), 0);
+    for name in ["HTM_dark.svg", "BIG_dark.svg"] {
+        let r = reqwest::get(format!("{relay}/logo/{name}")).await.unwrap();
+        assert_eq!(r.status(), 502, "{name}");
+        assert!(!d.path().join(format!("logo_{name}")).exists());
+    }
 }
