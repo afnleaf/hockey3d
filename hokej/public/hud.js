@@ -119,7 +119,7 @@ style.textContent = `
     bottom: var(--hud-gap); display: flex; flex-direction: column; gap: 6px;
   }
   #legend {
-    position: fixed; left: var(--hud-gap); top: calc(20% - 9em); width: 340px;
+    position: fixed; left: var(--hud-gap); top: max(calc(20% - 9em), 64px); width: 340px;
     pointer-events: none;
   }
   #legend .row {
@@ -135,7 +135,7 @@ style.textContent = `
   #legend .what { white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; }
   #shifts {
-    position: fixed; right: var(--hud-gap); top: calc(20% - 9em); width: 300px;
+    position: fixed; right: var(--hud-gap); top: max(calc(20% - 9em), 64px); width: 300px;
     max-height: calc(100% - 190px); overflow: auto;
   }
   #shifts .sh-strip { display: none; }

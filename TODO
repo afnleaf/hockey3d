@@ -4,7 +4,6 @@
 - [x] better arena render https://www.scotiabankarena.com/assets/img/live-tsp-240926-venueshots-banners-1949-3-595420d67e.jpg
 - [] optimize shaders/gfx and make it lightweight graphically
 - [1/2] arena stands
-- [] make sure team colors are sufficiently different for each matchup
 - [] rulebook changes respect the year 2009 to present
 - [] 3d models acting out the events with proper numbers and animations
 - [] heats maps
@@ -12,6 +11,7 @@
 - [] 3d engine change out of three.js prototype (raylib?)
 
 ## UX
+- [x] make sure team colors are sufficiently different for each matchup
 - [x] proper camera ux (how to move around and set views)
 - [x] fix mobile control ux
 - [x] HUD UX is so llm slop (unslopped more now)
