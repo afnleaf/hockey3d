@@ -28,7 +28,7 @@ style.textContent = `
   #timeline .tl-row { display: flex; align-items: center; gap: 10px;
     font-weight: 700; }
   #timeline-play { width: 30px; height: 30px; padding: 0; }
-  #timeline-play svg { display: block; width: 12px; height: 12px; fill: currentColor; }
+  #timeline-play svg { display: block; width: 18px; height: 18px; fill: currentColor; }
   #timeline-speed { width: 70px; margin: 0; accent-color: #fff; }
   #timeline-speed-label { min-width: 4ch; cursor: text; }
   #timeline .tl-hint { font-weight: 400; font-size: 12px; }
@@ -80,7 +80,7 @@ bar.innerHTML = `
     <span id="timeline-speed-label" class="hud-num"
       title="Click to type a speed (&lt; &gt; step)">${DEFAULT_SPEED}x</span>
     <span class="tl-hint hud-dim">space play &middot; &larr;/&rarr; 5s
-      &middot; j/l 10s &middot; &lt; &gt; speed &middot; 1-4 camera
+      &middot; j/l 10s &middot; &lt; &gt; speed &middot; 1-8 camera
       &middot; drag rotate &middot; right-drag pan &middot; wheel zoom
       &middot; double-click fly in</span>
     <span class="tl-time"></span>

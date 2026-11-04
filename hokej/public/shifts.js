@@ -14,10 +14,9 @@ style.textContent = `
   #shifts td { padding: 1px 4px; white-space: nowrap;
     font-variant-numeric: tabular-nums; }
   #shifts td.n { text-align: right; }
+  #shifts .pn { display: inline-block; width: 2ch; text-align: right;
+    margin-right: 0.5ch; }
   #shifts tr.on td, #shifts tr.box td { font-weight: 700; }
-  #shifts tr.on td:first-child::before, #shifts tr.box td:first-child::before {
-    content: "\\25CF"; font-size: 9px; margin-right: 3px; color: #7f7; }
-  #shifts tr.box td:first-child::before { visibility: hidden; }
   #shifts tr.box td { color: #fc6; }
   #shifts tr.hd td { font-size: 10px; font-weight: 600; color: var(--hud-dim);
     padding-top: 6px; text-transform: uppercase; }
@@ -104,17 +103,19 @@ export function renderShifts(t, boxed = [], strength = new Map()) {
     }
     const on = onIceAt(state.shifts, t, state.duration);
     const toi = toiAt(t);
-    const table = el("table", "sh-table");
+    const cols = el("div", "sh-cols");
     const strip = el("div", "sh-strip");
     state.teams.forEach((team, i) => {
+        const table = el("table", "sh-table");
+        cols.append(table);
         const players = on.filter((s) => s.teamId === team.id)
             .map((s) => ({ ...s, info: state.roster.get(s.playerId) }))
             .sort((a, b) => (POSITION_ORDER[a.info?.position] ?? 9)
                 - (POSITION_ORDER[b.info?.position] ?? 9));
         const tag = strength.get(team.id);
-        const title = `${team.abbrev} on ice (${players.length})`
-            + (tag ? ` \u00b7 ${tag}` : "");
-        row(table, "hd", [{ parts: [teamMark(team), " ", title] },
+        row(table, "hd", [{ parts: [teamMark(team), " ", team.abbrev,
+            el("span", "sh-long", ` on ice (${players.length})`),
+            tag ? ` \u00b7 ${tag}` : ""] },
             { cls: "n", parts: ["shift"] }, { cls: "n", parts: ["TOI"] }]);
         const skaters = [];
         const goalies = [];
@@ -122,8 +123,8 @@ export function renderShifts(t, boxed = [], strength = new Map()) {
         for (const p of players) {
             const num = p.info?.number ?? "?";
             const goalie = p.info?.position === "G";
-            const name = `${num} ${p.info?.lastName ?? p.name}`
-                + (goalie ? " G" : "");
+            const name = { parts: [el("span", "pn", String(num)),
+                (p.info?.lastName ?? p.name) + (goalie ? " G" : "")] };
             const elapsed = t - p.start;
             const shiftCell = [secondsToMmss(elapsed)];
             if (!goalie) {
@@ -138,7 +139,8 @@ export function renderShifts(t, boxed = [], strength = new Map()) {
         for (const b of teamBox) {
             const info = state.roster.get(b.playerId);
             const tr = row(table, "box", [
-                { parts: [`${info?.number ?? "?"} ${info?.lastName ?? "bench"}`] },
+                { parts: [el("span", "pn", String(info?.number ?? "?")),
+                    info?.lastName ?? "bench"] },
                 { cls: "n", parts: [`box ${b.clock}`] },
                 { cls: "n", parts: [secondsToMmss(toi.get(b.playerId) ?? 0)] }]);
             tr.title = b.detail;
@@ -163,5 +165,5 @@ export function renderShifts(t, boxed = [], strength = new Map()) {
         line.append(clk);
         strip.append(line);
     });
-    panel.replaceChildren(strip, table);
+    panel.replaceChildren(strip, cols);
 }

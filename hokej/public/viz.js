@@ -7,7 +7,7 @@ import { logoUrl } from "./relay.js";
 import { loadEvents, applyVisibility, gameColors, pickEvent, setPinned }
     from "./events.js";
 import { renderer } from "./scene.js";
-import { setScoreboard, setGameState, legendSection } from "./hud.js";
+import { setScoreboard, setGameState, legendSection, showPeek } from "./hud.js";
 import { initTimeline, setMarkers } from "./timeline.js";
 import { initFilters, passesFilters, showVisibleCount, isShowAll }
     from "./filters.js";
@@ -124,6 +124,8 @@ function refreshEvents() {
     renderRecent(time);
 }
 
+let lastPeekTime = Infinity, lastPeekTitle;
+
 // Covers every play, not only drawable ones, so stoppages and period
 // marks also appear; the type/team filters still apply. Newest first.
 function renderRecent(t) {
@@ -144,10 +146,17 @@ function renderRecent(t) {
         if (team?.logo) { sw.src = team.logo; sw.alt = team.abbrev; }
         const what = document.createElement("span");
         what.className = "what";
-        const who = playerText(p.playerId);
-        what.textContent = typeLabel(p) + (who ? ` \u00b7 ${who}` : "");
-        row.title = [team?.abbrev, what.textContent].filter(Boolean).join(" ");
-        row.append(when, sw, iconElement(p.type, "#fff", 14), what);
+        what.textContent = typeLabel(p);
+        const pl = game.roster.get(p.playerId);
+        const num = document.createElement("span");
+        num.className = "hud-num num";
+        num.textContent = pl ? pl.number : "";
+        const name = document.createElement("span");
+        name.className = "what";
+        name.textContent = pl ? pl.name : "";
+        row.title = [team?.abbrev, typeLabel(p), pl && `${pl.number} ${pl.name}`]
+            .filter(Boolean).join(" ");
+        row.append(when, sw, iconElement(p.type, "#fff", 14), what, num, name);
         rows.push(row);
     }
     if (!rows.length) {
@@ -157,6 +166,12 @@ function renderRecent(t) {
         rows.push(none);
     }
     legendSection.replaceChildren(...rows);
+    // Peek only when playback reaches a newer event, not on seeks back.
+    const newest = rows[0]?.title ? rows[0] : null;
+    if (newest && t > lastPeekTime && newest.title !== lastPeekTitle
+        && t - lastPeekTime < 30) showPeek(newest.cloneNode(true));
+    lastPeekTime = t;
+    lastPeekTitle = newest?.title;
 }
 
 const DETAIL_PLAYERS = [
@@ -368,7 +383,7 @@ export function loadGame(pbp, shiftJson, shiftError) {
         id: t.id,
         abbrev: t.abbrev,
         color: "#" + colors.get(t.id).toString(16).padStart(6, "0"),
-        logo: logoUrl(t.darkLogo ?? t.logo),
+        logo: logoUrl(t.logo ?? t.darkLogo),
     }));
     renderCenterLogo(logoUrl(game.home.logo));
     setBenchColors(teams[1].color, teams[0].color);

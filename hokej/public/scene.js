@@ -33,14 +33,75 @@ export const controls = new RinkControls(camera, renderer.domElement);
 
 // 35° elevation gives the broadcast look; nets sit at x=±89, benches at +y.
 const TILT = 35 * Math.PI / 180;
-const SIDE_D = 110;
-const END_D = 170;
+// Matches the controls' TILT_MAX so a preset is not clamped after the tween.
+const BIRD_TILT = 85 * Math.PI / 180;
+// Boards outline plus cap height; the fit keeps all of it on screen.
+const FIT_POINTS = [];
+for (const x of [-100, 0, 100]) for (const y of [-42.5, 42.5]) for (const z of [0, 3.5])
+    FIT_POINTS.push(new THREE.Vector3(x, y, z));
+// Scoreboard on top, timeline at the bottom (CSS px).
+const HUD_TOP = 64;
+const HUD_BOTTOM = 72;
+const HUD_SIDE = 8;
 export const CAMERA_PRESETS = [
-    { name: "Penalty box side", pos: [0, -SIDE_D * Math.cos(TILT), SIDE_D * Math.sin(TILT)] },
-    { name: "Bench side", pos: [0, SIDE_D * Math.cos(TILT), SIDE_D * Math.sin(TILT)] },
-    { name: "Left net bottom", pos: [-END_D * Math.cos(TILT), 0, END_D * Math.sin(TILT)] },
-    { name: "Right net bottom", pos: [END_D * Math.cos(TILT), 0, END_D * Math.sin(TILT)] },
+    { name: "Penalty box side", az: -Math.PI / 2, tilt: TILT },
+    { name: "Bench side", az: Math.PI / 2, tilt: TILT },
+    { name: "Left net bottom", az: Math.PI, tilt: TILT },
+    { name: "Right net bottom", az: 0, tilt: TILT },
+    { name: "Penalty box side, top", az: -Math.PI / 2, tilt: BIRD_TILT },
+    { name: "Bench side, top", az: Math.PI / 2, tilt: BIRD_TILT },
+    { name: "Left net bottom, top", az: Math.PI, tilt: BIRD_TILT },
+    { name: "Right net bottom, top", az: 0, tilt: BIRD_TILT },
 ];
+
+function presetPos(az, tilt, d) {
+    return [d * Math.cos(tilt) * Math.cos(az), d * Math.cos(tilt) * Math.sin(az), d * Math.sin(tilt)];
+}
+
+const fitCam = new THREE.PerspectiveCamera();
+const fitV = new THREE.Vector3();
+// Smallest distance at which the rink fits inside the HUD-free area.
+function fitDistance(az, tilt, aspect, insets) {
+    fitCam.fov = camera.fov;
+    fitCam.aspect = aspect;
+    fitCam.near = camera.near;
+    fitCam.far = camera.far;
+    fitCam.up.set(0, 0, 1);
+    fitCam.updateProjectionMatrix();
+    const fits = (d) => {
+        fitCam.position.set(...presetPos(az, tilt, d));
+        fitCam.lookAt(0, 0, 0);
+        fitCam.updateMatrixWorld();
+        return FIT_POINTS.every((p) => {
+            fitV.copy(p).project(fitCam);
+            return fitV.z < 1 && fitV.x >= -1 + insets.side && fitV.x <= 1 - insets.side
+                && fitV.y >= -1 + insets.bottom && fitV.y <= 1 - insets.top;
+        });
+    };
+    let lo = 8, hi = 800;
+    for (let k = 0; k < 30; k++) {
+        const mid = (lo + hi) / 2;
+        if (fits(mid)) hi = mid; else lo = mid;
+    }
+    return hi;
+}
+
+// Measured from the live HUD so phone and desktop layouts both fit.
+function screenInsets() {
+    const w = window.innerWidth, h = window.innerHeight;
+    let top = HUD_TOP, bottom = HUD_BOTTOM;
+    const board = document.getElementById("scoreboard")?.getBoundingClientRect();
+    if (board && board.height) top = board.bottom + HUD_SIDE;
+    const bar = document.getElementById("timeline")?.getBoundingClientRect();
+    if (bar && bar.height) bottom = h - bar.top + HUD_SIDE;
+    return { top: 2 * top / h, bottom: 2 * bottom / h, side: 2 * HUD_SIDE / w };
+}
+
+export function presetPose(i, aspect = camera.aspect, insets = screenInsets()) {
+    const p = CAMERA_PRESETS[i];
+    const dist = fitDistance(p.az, p.tilt, aspect, insets);
+    return { az: p.az, tilt: p.tilt, dist, pos: presetPos(p.az, p.tilt, dist) };
+}
 
 const TWEEN_MS = 600;
 
@@ -49,10 +110,8 @@ export function setCameraPreset(i, animate = true) {
     const p = CAMERA_PRESETS[i];
     if (!p) return;
     localStorage.setItem("hokej.camera", String(i));
-    const [x, y, z] = p.pos;
-    const dist = Math.hypot(x, y, z);
-    controls.flyTo({ x: 0, y: 0, dist, az: Math.atan2(y, x), tilt: Math.asin(z / dist) },
-        animate ? TWEEN_MS : 0);
+    const { az, tilt, dist } = presetPose(i);
+    controls.flyTo({ x: 0, y: 0, dist, az, tilt }, animate ? TWEEN_MS : 0);
 }
 
 const THUMB_W = 160;
@@ -67,8 +126,8 @@ export function presetSnapshots() {
     out.width = THUMB_W;
     out.height = THUMB_H;
     const ctx = out.getContext("2d");
-    const urls = CAMERA_PRESETS.map((p) => {
-        cam.position.set(...p.pos);
+    const urls = CAMERA_PRESETS.map((p, i) => {
+        cam.position.set(...presetPose(i, src.width / src.height).pos);
         cam.up.set(0, 0, 1);
         cam.lookAt(0, 0, 0);
         cam.aspect = src.width / src.height;
@@ -88,11 +147,13 @@ export function presetSnapshots() {
 const saved = Number(localStorage.getItem("hokej.camera"));
 if (Number.isInteger(saved) && CAMERA_PRESETS[saved]) setCameraPreset(saved, false);
 
+const debugHelpers = new THREE.Group();
 function renderTools() {
     const gridHelper = new THREE.GridHelper(1000, 40);
     gridHelper.rotation.x = Math.PI / 2;
-    scene.add(gridHelper);
-    scene.add(new THREE.AxesHelper(500));
+    debugHelpers.add(gridHelper, new THREE.AxesHelper(500));
+    debugHelpers.visible = false;
+    scene.add(debugHelpers);
 }
 
 // Exposed so headless probes can read renderer.info.
@@ -113,7 +174,9 @@ let statsWanted = false;
 let statsInGame = false;
 export function setStatsVisible(shown) {
     statsWanted = shown;
-    stats.dom.style.display = statsWanted && statsInGame ? "flex" : "none";
+    const on = statsWanted && statsInGame;
+    stats.dom.style.display = on ? "flex" : "none";
+    debugHelpers.visible = on;
 }
 export function setStatsInGame(inGame) {
     statsInGame = inGame;

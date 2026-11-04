@@ -10,8 +10,8 @@ style.textContent = `
   #hud-container {
     --hud-fg: #fff;
     --hud-dim: rgba(255, 255, 255, 0.68);
-    --hud-solid: rgba(14, 16, 22, 0.92);
     --hud-gap: 18px;
+    --hud-panel: rgba(12, 18, 26, 0.62);
     --hud-mono: 'Atkinson Hyperlegible Mono', 'SF Mono', Menlo, monospace;
     /* Halo keeps white text legible over ice, boards and yellow seats. */
     --hud-sh: 0 0 2px #000, 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9),
@@ -20,13 +20,14 @@ style.textContent = `
     font: 13px/1.25 'Atkinson Hyperlegible Next', -apple-system, sans-serif;
     color: var(--hud-fg); text-shadow: var(--hud-sh);
     -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
   .hud-el {
     pointer-events: auto; border-radius: 8px; padding: 6px 8px;
     box-sizing: border-box; transition: background 0.15s;
   }
   .hud-solid {
-    background: var(--hud-solid); text-shadow: none;
+    background: var(--hud-panel); text-shadow: var(--hud-sh);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
   }
   .hud-btn {
@@ -39,11 +40,12 @@ style.textContent = `
   .hud-btn[hidden] { display: none; }
   .hud-btn svg { filter: drop-shadow(0 0 1.5px #000); }
   #hud-icons .hud-btn[aria-expanded="true"],
-  #hud-icons .hud-btn[aria-pressed="true"] {
-    background: var(--hud-solid); text-shadow: none;
+  #hud-icons .hud-btn[aria-pressed="true"],
+  #hud-sheets .hud-btn[aria-pressed="true"] {
+    background: var(--hud-panel); text-shadow: var(--hud-sh);
   }
   @media (hover: hover) {
-    .hud-btn:hover { background: var(--hud-solid); text-shadow: none; }
+    .hud-btn:hover { background: var(--hud-panel); text-shadow: var(--hud-sh); }
   }
   .hud-mono { font-family: var(--hud-mono); }
   .hud-num { font-variant-numeric: tabular-nums; }
@@ -117,18 +119,23 @@ style.textContent = `
     bottom: var(--hud-gap); display: flex; flex-direction: column; gap: 6px;
   }
   #legend {
-    position: fixed; left: var(--hud-gap); top: 20%; width: 340px;
+    position: fixed; left: var(--hud-gap); top: calc(20% - 9em); width: 340px;
+    pointer-events: none;
   }
   #legend .row {
-    display: grid; grid-template-columns: 44px 24px 16px minmax(0, 1fr);
+    display: grid;
+    grid-template-columns: 44px 24px 20px 92px 2ch minmax(0, 1fr);
     gap: 6px; align-items: center; padding: 2px 0; opacity: 0.8;
   }
-  #legend .ev-logo { width: 24px; height: 24px; margin: -4px 0; object-fit: contain; }
+  .ev-logo { width: 24px; height: 24px; object-fit: contain; }
+  #legend .ev-logo { margin: -4px 0; }
+  #ev-peek { display: none; }
+  #legend .num { text-align: right; }
   #legend .row:first-child { font-size: 15px; font-weight: 700; opacity: 1; }
   #legend .what { white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; }
   #shifts {
-    position: fixed; right: var(--hud-gap); top: 20%; width: 300px;
+    position: fixed; right: var(--hud-gap); top: calc(20% - 9em); width: 300px;
     max-height: calc(100% - 190px); overflow: auto;
   }
   #shifts .sh-strip { display: none; }
@@ -139,6 +146,14 @@ style.textContent = `
   #event-key .key-row { display: flex; align-items: center; gap: 6px;
     white-space: nowrap; }
 
+  #hud-sheets { display: flex; gap: 6px; position: absolute; top: 18px;
+    right: var(--hud-gap); pointer-events: auto; }
+  @media (min-width: ${NARROW}px) {
+    #hud-container.hide-events #legend, #hud-container.hide-shifts #shifts,
+    #hud-container.hide-key #event-key { display: none; }
+  }
+  #hud-sheets .sheet-btn { display: flex; align-items: center;
+    justify-content: center; }
   @media (max-width: ${NARROW - 1}px) {
     #hud-container { --hud-gap: 10px; }
     #scoreboard { top: var(--hud-gap); column-gap: 5px;
@@ -148,7 +163,40 @@ style.textContent = `
     #scoreboard .score { font-size: 24px; }
     #scoreboard .status { font-size: 13px; }
     #scoreboard .sog { display: none; }
-    #event-key, #legend, #shifts { display: none; }
+    #event-key, #legend, #shifts, #ev-peek { display: none; }
+    #hud-sheets { display: flex; flex-direction: column; gap: 6px;
+      position: absolute; top: 72px; right: var(--hud-gap); pointer-events: auto; }
+    #hud-container.sheet-events #legend,
+    #hud-container.sheet-shifts #shifts {
+      display: block; overflow: hidden;
+      max-height: min(45vh, calc(100dvh - 430px));
+      background: none; border-radius: 10px;
+      padding: 8px var(--hud-gap); pointer-events: none; }
+    #hud-container.sheet-events #legend .row:nth-child(n+4) { display: grid; }
+    #hud-container.sheet-events #legend .row.unfit { display: none; }
+    #hud-container.sheet-shifts #shifts .sh-strip { display: none; }
+    #hud-container.sheet-shifts #shifts .sh-table { display: table; }
+    #hud-container.sheet-shifts #shifts .sh-cols { display: grid;
+      grid-template-columns: 1fr 1fr; column-gap: 8px; }
+    #shifts .sh-cols td:nth-child(3), #shifts .sh-long { display: none; }
+    #shifts .sh-cols td { padding: 1px 2px; }
+    #ev-peek.show { display: block; position: fixed; left: var(--hud-gap);
+      right: var(--hud-gap); bottom: 124px; padding: 6px 10px; font-size: 12px;
+      background: none; border-radius: 8px; pointer-events: none; }
+    #ev-peek .row { display: grid; gap: 6px; align-items: center;
+      grid-template-columns: 44px 24px 20px 92px 2ch minmax(0, 1fr); }
+    #ev-peek .ev-logo { width: 24px; height: 24px; object-fit: contain; }
+    #ev-peek .num { text-align: right; }
+    #ev-peek .what { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #hud-container.sheet-events #ev-peek { display: none; }
+    #ev-peek.show { z-index: 2; }
+    #ev-peek.show ~ #hud-bottom #shifts,
+    #ev-peek.show ~ #hud-bottom #event-key { transform: translateY(-44px); }
+    #shifts, #event-key { transition: transform 0.15s ease-out; }
+    #hud-container.sheet-key #event-key { display: grid; position: static;
+      grid-template-columns: 1fr 1fr; gap: 3px 10px; max-height: 45vh; overflow: auto;
+      background: var(--hud-panel); border-radius: 10px;
+      padding: 8px var(--hud-gap); pointer-events: auto; }
     #hud-icons { top: 72px; flex-direction: column; }
     #game-info { display: none; }
     .hud-popover { top: 72px; left: 54px;
@@ -196,25 +244,47 @@ const icons = document.createElement("div");
 icons.id = "hud-icons";
 icons.innerHTML = `
   <button class="hud-btn" id="back-to-list" title="Back to games"
-    aria-label="Back to games">&#8592;</button>
+    aria-label="Back to games">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+      stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 8H2M7 3 2 8l5 5"/></svg></button>
   <button class="hud-btn" id="filter-toggle" title="Event filters"
     aria-label="Event filters" aria-expanded="false">
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
       stroke="#fff" stroke-width="1.8" stroke-linejoin="round">
       <path d="M1.5 2.5h13l-5 6v5l-3-1.5v-3.5z"/></svg></button>
-  <button class="hud-btn" id="camera-toggle" title="Camera views (1-4)"
+  <button class="hud-btn" id="camera-toggle" title="Camera views (1-8)"
     aria-label="Camera views" aria-expanded="false">
     <svg width="18" height="16" viewBox="0 0 18 16" fill="none"
       stroke="#fff" stroke-width="1.8" stroke-linejoin="round">
       <path d="M1.5 4.5h3.5l1.5-2h5l1.5 2h3.5v9h-15z"/>
       <circle cx="9" cy="9" r="2.8"/></svg></button>
-  <button class="hud-btn" id="stats-toggle" title="Render stats"
-    aria-label="Render stats" aria-pressed="true">
+  <button class="hud-btn" id="stats-toggle" title="Debug: stats, grid, axes"
+    aria-label="Debug: stats, grid, axes" aria-pressed="false">
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
       stroke="#fff" stroke-width="1.8" stroke-linecap="round">
-      <path d="M2 14V9M6 14V3M10 14V7M14 14V5"/></svg></button>`;
+      <path d="M2 14V9M6 14V3M10 14V7M14 14V5"/></svg></button>
+  <button class="hud-btn sheet-btn" id="events-sheet" aria-label="Events"
+    title="Events" aria-pressed="false">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+      stroke="#fff" stroke-width="1.8" stroke-linecap="round">
+      <path d="M2 3h1M2 8h1M2 13h1M6 3h8M6 8h8M6 13h8"/></svg></button>
+  <button class="hud-btn sheet-btn" id="shifts-sheet" aria-label="Shifts"
+    title="Shifts" aria-pressed="false">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+      stroke="#fff" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="8" cy="9" r="5.5"/><path d="M8 9V6M6.5 1.5h3"/></svg></button>
+  <button class="hud-btn sheet-btn" id="key-sheet" aria-label="Icon key"
+    title="Icon key" aria-pressed="false">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+      stroke="#fff" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/>
+      <path d="M8 7.2V11.5"/><circle cx="8" cy="4.8" r="0.4" fill="#fff"/></svg></button>`;
 // app.js owns the navigation this button triggers.
 export const backButton = icons.querySelector("#back-to-list");
+const sheetIcons = document.createElement("div");
+sheetIcons.id = "hud-sheets";
+sheetIcons.append(icons.querySelector("#key-sheet"),
+  ...icons.querySelectorAll(".sheet-btn:not(#key-sheet)"));
 
 const gameInfo = document.createElement("div");
 gameInfo.id = "game-info";
@@ -295,13 +365,84 @@ keySection.id = "event-key";
 keySection.className = "hud-el";
 shiftsSection.id = "shifts";
 shiftsSection.className = "hud-el";
-bottom.append(legendSection, shiftsSection);
+bottom.append(keySection, legendSection, shiftsSection);
 // timeline.js appends its bar last
 export const bottomSlot = bottom;
 
-hudContainer.append(scoreboard, icons, gameInfo, filterPanel, cameraPanel,
-    keySection, bottom);
+const peek = document.createElement("div");
+peek.id = "ev-peek";
+
+hudContainer.append(scoreboard, icons, sheetIcons, gameInfo, filterPanel, cameraPanel,
+    peek, bottom);
 document.body.appendChild(hudContainer);
+
+// Phone only: one bottom sheet at a time, remembered across games.
+const sheetButtons = { events: sheetIcons.querySelector("#events-sheet"),
+    shifts: sheetIcons.querySelector("#shifts-sheet"), key: sheetIcons.querySelector("#key-sheet") };
+const narrow = matchMedia(`(max-width: ${NARROW - 1}px)`);
+// Phone sheets are exclusive; desktop panels toggle independently.
+function setSheet(which) {
+    for (const [k, b] of Object.entries(sheetButtons)) {
+        hudContainer.classList.toggle(`sheet-${k}`, k === which);
+        if (narrow.matches) b.setAttribute("aria-pressed", String(k === which));
+    }
+    localStorage.setItem("hokej.sheet", which || "");
+    fitLegend();
+}
+function setDesk(k, shown) {
+    hudContainer.classList.toggle(`hide-${k}`, !shown);
+    localStorage.setItem(`hokej.desk.${k}`, shown ? "1" : "0");
+    if (!narrow.matches) sheetButtons[k].setAttribute("aria-pressed", String(shown));
+}
+function syncButtons() {
+    for (const [k, b] of Object.entries(sheetButtons)) b.setAttribute("aria-pressed",
+        String(narrow.matches ? hudContainer.classList.contains(`sheet-${k}`)
+            : !hudContainer.classList.contains(`hide-${k}`)));
+}
+// Sheets pass touches to the rink, so the events list cannot scroll: show only
+// the newest rows that fit.
+function fitLegend() {
+    const rows = legendSection.querySelectorAll(".row");
+    rows.forEach((r) => r.classList.remove("unfit"));
+    if (!hudContainer.classList.contains("sheet-events")) return;
+    const limit = legendSection.getBoundingClientRect().top + legendSection.clientHeight - 8;
+    let over = false;
+    for (const r of rows) {
+        over ||= r.getBoundingClientRect().bottom > limit;
+        if (over) r.classList.add("unfit");
+    }
+}
+new MutationObserver(fitLegend).observe(legendSection, { childList: true });
+addEventListener("resize", fitLegend);
+setSheet(localStorage.getItem("hokej.sheet") || null);
+for (const k of Object.keys(sheetButtons))
+    setDesk(k, localStorage.getItem(`hokej.desk.${k}`) !== "0");
+syncButtons();
+narrow.addEventListener("change", syncButtons);
+for (const [k, b] of Object.entries(sheetButtons)) {
+    b.addEventListener("click", () => {
+        if (!narrow.matches) return setDesk(k, hudContainer.classList.contains(`hide-${k}`));
+        setSheet(hudContainer.classList.contains(`sheet-${k}`) ? null : k);
+    });
+}
+// A tap on the rink closes the sheet; drags still move the camera.
+let tap0 = null;
+document.addEventListener("pointerdown", (e) => {
+    tap0 = e.target.tagName === "CANVAS" ? [e.clientX, e.clientY] : null; });
+document.addEventListener("pointerup", (e) => {
+    if (tap0 && Math.hypot(e.clientX - tap0[0], e.clientY - tap0[1]) < 10)
+        setSheet(null);
+    tap0 = null;
+});
+
+let peekTimer = 0;
+export function showPeek(row) {
+    if (hudContainer.classList.contains("sheet-events")) return;
+    peek.replaceChildren(row);
+    peek.classList.add("show");
+    clearTimeout(peekTimer);
+    peekTimer = setTimeout(() => peek.classList.remove("show"), 2000);
+}
 
 // teams: [away, home] as { abbrev, color }; info is a dim subtitle line.
 export function setScoreboard(teams, info) {

@@ -12,11 +12,9 @@
 - [] 3d engine change out of three.js prototype (raylib?)
 
 ## UX
-- [1/2] proper camera ux (how to move around and set views)
-- fix mobile controls
-- fix mobile ux
-- [x] HUD UX is so llm slop
-- [] mobile
+- [x] proper camera ux (how to move around and set views)
+- [x] fix mobile control ux
+- [x] HUD UX is so llm slop (unslopped more now)
 - [] full diagetic
     - box view paper work notes menu/game picker
     - jumbotron scoreboard ui timeline, etc?

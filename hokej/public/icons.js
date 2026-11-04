@@ -17,8 +17,11 @@ export function iconSvg(type, color = "currentColor", px = 24) {
 
 export function iconElement(type, color, px = 16) {
     const span = document.createElement("span");
-    span.style.cssText = `display:inline-flex;width:${px}px;height:${px}px;`
-        + "flex:none";
+    // Dark disc keeps the white glyph legible over white ice.
+    span.style.cssText = `display:inline-flex;width:${px + 6}px;`
+        + `height:${px + 6}px;flex:none;align-items:center;`
+        + "justify-content:center;border-radius:50%;"
+        + "background:rgba(12,18,26,0.72)";
     span.innerHTML = iconSvg(type, color, px);
     return span;
 }

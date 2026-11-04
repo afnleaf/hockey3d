@@ -2,11 +2,11 @@
 import { loadGame } from "./viz.js";
 import { pause } from "./timeline.js";
 import { backButton as back } from "./hud.js";
-import { setStatsInGame } from "./scene.js";
+import { setStatsInGame, setCameraPreset, CAMERA_PRESETS } from "./scene.js";
 import { RELAY_BASE, logoUrl } from "./relay.js";
 
 // Routes: "" = game list, "#date=YYYY-MM-DD" = list for a day,
-// "#game=ID" = visualizer.
+// "#game=ID" = visualizer, "#arena&cam=N" = bare rink for thumbnails.
 
 const GAME_ID_RE = /^(20090[2-9]|20[1-9]\d{3})\d{4}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -20,6 +20,7 @@ const FIRST_DAY = "2009-10-01";
         background: #fff; color: #111;
         font: 15px 'Atkinson Hyperlegible Next', sans-serif;
         touch-action: manipulation; }
+      body.arena > :not(canvas) { display: none !important; }
       #main-page header { position: sticky; top: 0; z-index: 1; background: #fff;
         display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
         gap: 12px; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
@@ -35,9 +36,10 @@ const FIRST_DAY = "2009-10-01";
         border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
       @media (hover: hover) { #main-page button:hover { background: #f3f4f6; } }
       #main-page button, #main-page input { -webkit-tap-highlight-color: transparent; }
-      #prev-day, #next-day { width: 36px; height: 34px; padding: 0;
+      #main-page #prev-day, #main-page #next-day { width: 36px; height: 34px; padding: 0;
         display: inline-flex; align-items: center; justify-content: center; }
-      #prev-day svg, #next-day svg { width: 12px; height: 12px; fill: currentColor; }
+      #prev-day svg, #next-day svg { flex: none; width: 20px; height: 20px; fill: none;
+        stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
       #main-page button:disabled { opacity: 0.3; cursor: default; background: #fff; }
       #main-page input { color-scheme: light; }
       #game-list { max-width: 760px; margin: 24px auto; padding: 0 16px;
@@ -111,9 +113,9 @@ const FIRST_DAY = "2009-10-01";
     page.innerHTML = `
       <header>
         <h1>HOKEJ</h1>
-        <button id="prev-day" title="Previous day"><svg viewBox="0 0 12 12"><path d="M10 1 2 6l8 5z"/></svg></button>
+        <button id="prev-day" title="Previous day"><svg viewBox="0 0 16 16"><path d="M14 8H2M7 3 2 8l5 5"/></svg></button>
         <span class="day-label" id="day-label"></span>
-        <button id="next-day" title="Next day"><svg viewBox="0 0 12 12"><path d="M2 1l8 5-8 5z"/></svg></button>
+        <button id="next-day" title="Next day"><svg viewBox="0 0 16 16"><path d="M2 8h12M9 3l5 5-5 5"/></svg></button>
         <input type="date" id="day-input" min="2009-10-01" title="Jump to date">
         <button id="pick-day" title="Jump to date"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 7h12M5 1.5v3M11 1.5v3"/></svg></button>
         <button id="yesterday">Yesterday</button>
@@ -285,6 +287,7 @@ const FIRST_DAY = "2009-10-01";
         vizStatus.hidden = false;
         vizStatus.textContent = `Loading game ${id}...`;
         const seq = ++requestSeq;
+        gameLoaded = true;
         try {
             // shifts are optional: older seasons return no rows
             const [pbp, shifts] = await Promise.all([
@@ -305,12 +308,26 @@ const FIRST_DAY = "2009-10-01";
     }
 
     let shownDateForBack = null;
+    // game objects stay in the scene, so the bare arena needs a fresh page
+    let gameLoaded = false;
     let lastDay = null;
 
     function route() {
         const params = new URLSearchParams(location.hash.slice(1));
         const game = params.get("game");
         const date = params.get("date");
+        const arena = params.has("arena");
+        if (arena && gameLoaded) { location.reload(); return; }
+        document.body.classList.toggle("arena", arena);
+        if (arena) {
+            ++requestSeq;
+            page.hidden = true;
+            setStatsInGame(false);
+            document.title = "hokej arena";
+            const cam = Number(params.get("cam")) - 1;
+            if (CAMERA_PRESETS[cam]) setCameraPreset(cam, false);
+            return;
+        }
         if (game && GAME_ID_RE.test(game)) {
             showGame(game);
             return;
@@ -347,8 +364,13 @@ const FIRST_DAY = "2009-10-01";
     });
 
     window.addEventListener("hashchange", route);
-    const initialGame = new URLSearchParams(location.hash.slice(1)).get("game");
+    const initialParams = new URLSearchParams(location.hash.slice(1));
+    const initialGame = initialParams.get("game");
     if (initialGame && GAME_ID_RE.test(initialGame)) page.hidden = true;
+    if (initialParams.has("arena")) {
+        document.body.classList.add("arena");
+        page.hidden = true;
+    }
     // today's schedule carries the current season's playoffEndDate, the
     // last day the API schedules; route anyway if it fails
     fetchJSON(`/v1/schedule/${localToday()}`)
