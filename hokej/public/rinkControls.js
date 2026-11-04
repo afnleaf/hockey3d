@@ -7,12 +7,12 @@ const TILT_MIN = 10 * DEG;
 const TILT_MAX = 85 * DEG;
 // At MIN_DIST and TILT_MIN the eye sits about 1.4ft above the ice.
 const MIN_DIST = 8;
-const MAX_DIST = 400;
+const MAX_DIST = 800;
 // Below FLATTEN_DIST the tilt cap falls linearly to TILT_MIN at MIN_DIST.
 const FLATTEN_DIST = 70;
-// Rink boards sit at x=±100, y=±42.5.
-const BOUND_X = 97;
-const BOUND_Y = 40;
+// Room to explore the stands and concourse around the boards at x=±100, y=±42.5.
+const BOUND_X = 250;
+const BOUND_Y = 150;
 // Below this eye height the camera must stay inside the boards and glass.
 const LOW_Z = 12;
 // Rays that hit the ice beyond this are near the horizon and too unstable to drag.
@@ -20,6 +20,10 @@ const MAX_HIT = 1500;
 const DRAG_PX = 4;
 const TAP_MS = 300;
 const TAP_PX = 24;
+const TOUCH_SLOP = 10;
+const TWO_SLOP = 18;
+// Twist joins a pinch only after a clear turn, about 20 degrees.
+const TWIST_UNLOCK = 20 * Math.PI / 180;
 // Wheel zoom closes this share of the remaining gap every 16ms (~150ms settle).
 const ZOOM_EASE = 0.25;
 
@@ -206,8 +210,17 @@ export class RinkControls {
         const dy = e.clientY - p.y;
         p.x = e.clientX;
         p.y = e.clientY;
-        if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > DRAG_PX) this._moved = true;
+        const slop = e.pointerType === "touch" ? TOUCH_SLOP : DRAG_PX;
+        const was = this._moved;
+        if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > slop) this._moved = true;
         if (this._pointers.size >= 2) { this._moveTwo(); return; }
+        // Imperfect fingers jiggle; hold the view until the drag is deliberate.
+        if (!this._moved) return;
+        // Re-grab where the slop ended so the view starts moving from here, not jumps.
+        if (!was && this._mode === "pan") {
+            if (this._ground(e.clientX, e.clientY)) this._grab.copy(this._hit);
+            return;
+        }
         if (this._mode === "pan") this._keepUnder(e.clientX, e.clientY);
         else if (this._mode === "rotate") {
             const h = this.dom.clientHeight;
@@ -256,7 +269,7 @@ export class RinkControls {
     _startTwo() {
         this._mode = "two";
         this._moved = true;
-        Object.assign(this._two, this._twoGeom(), { acc: 0, accTilt: 0, lock: null });
+        Object.assign(this._two, this._twoGeom(), { accLen: 0, accAng: 0, accTilt: 0, lock: null, twist: false });
     }
 
     _moveTwo() {
@@ -266,13 +279,19 @@ export class RinkControls {
         let dAng = g.ang - s.ang;
         dAng -= Math.round(dAng / (2 * Math.PI)) * 2 * Math.PI;
         const dmy = g.my - s.my;
-        // A parallel vertical drag tilts; anything else pinches and twists.
-        if (!s.lock) {
-            s.acc += Math.abs(dLen) + Math.abs(dAng) * s.len;
-            s.accTilt += dmy;
-            if (Math.abs(s.accTilt) > 12 && Math.abs(s.accTilt) > s.acc) s.lock = "tilt";
-            else if (s.acc > 12) s.lock = "pinch";
+        s.accLen += dLen;
+        s.accAng += dAng;
+        s.accTilt += dmy;
+        const lenPx = Math.abs(s.accLen);
+        const angPx = Math.abs(s.accAng) * s.len;
+        const tiltPx = Math.abs(s.accTilt);
+        // One gesture per touch: whichever axis clears the slop first wins,
+        // so the other axes do not pick up finger noise.
+        if (!s.lock && Math.max(lenPx, angPx, tiltPx) > TWO_SLOP) {
+            if (tiltPx >= lenPx && tiltPx >= angPx) s.lock = "tilt";
+            else { s.lock = "pinch"; s.twist = angPx > lenPx; }
         }
+        if (s.lock === "pinch" && !s.twist && Math.abs(s.accAng) > TWIST_UNLOCK) s.twist = true;
         if (s.lock === "tilt") {
             this.tilt = this._eff + dmy / this.dom.clientHeight * Math.PI;
             this.update();
@@ -281,7 +300,7 @@ export class RinkControls {
                 this._grab.copy(this._hit);
                 // Raw 1:1 pinch ratio felt too fast on phones.
                 if (g.len > 1 && s.len > 1) this.dist *= Math.pow(s.len / g.len, 0.6);
-                this.az -= dAng;
+                if (s.twist) this.az -= dAng;
                 this._keepUnder(g.mx, g.my);
             }
         }

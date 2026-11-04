@@ -225,7 +225,7 @@ function setStatsShown(shown) {
     statsToggle.setAttribute("aria-pressed", String(shown));
     localStorage.setItem("hokej.stats", shown ? "1" : "0");
 }
-setStatsShown(localStorage.getItem("hokej.stats") !== "0");
+setStatsShown(localStorage.getItem("hokej.stats") === "1");
 statsToggle.addEventListener("click", () =>
     setStatsShown(statsToggle.getAttribute("aria-pressed") !== "true"));
 

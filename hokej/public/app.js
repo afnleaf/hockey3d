@@ -2,6 +2,7 @@
 import { loadGame } from "./viz.js";
 import { pause } from "./timeline.js";
 import { backButton as back } from "./hud.js";
+import { setStatsInGame } from "./scene.js";
 import { RELAY_BASE, logoUrl } from "./relay.js";
 
 // Routes: "" = game list, "#date=YYYY-MM-DD" = list for a day,
@@ -16,33 +17,40 @@ const FIRST_DAY = "2009-10-01";
     const style = document.createElement("style");
     style.textContent = `
       #main-page { position: fixed; inset: 0; z-index: 2000; overflow: auto;
-        background: #15171c; color: #eee;
-        font: 15px 'Atkinson Hyperlegible Next', sans-serif; }
-      #main-page header { position: sticky; top: 0; background: #1d2027;
-        display: flex; align-items: center; justify-content: center; gap: 12px;
-        padding: 14px; border-bottom: 1px solid #2c3039; }
+        background: #fff; color: #111;
+        font: 15px 'Atkinson Hyperlegible Next', sans-serif;
+        touch-action: manipulation; }
+      #main-page header { position: sticky; top: 0; z-index: 1; background: #fff;
+        display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+        gap: 12px; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
       #main-page h1 { margin: 0 24px 0 0; font-size: 20px; letter-spacing: 2px; }
-      #main-page .day-label { min-width: 210px; text-align: center;
-        font-size: 17px; font-weight: bold; }
+      #main-page .day-label { flex: 0 0 13em; margin: 0; text-align: center;
+        font-size: 17px; font-weight: bold; font-variant-numeric: tabular-nums;
+        white-space: nowrap; font-family: ui-monospace, Menlo, Consolas, monospace; }
+      #day-input { font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-variant-numeric: tabular-nums; }
+      #pick-day { display: none; align-items: center; justify-content: center; }
       #main-page button, #main-page input {
-        background: #2c3039; color: #eee; border: 1px solid #3c414d;
+        background: #fff; color: #111; border: 1px solid #d1d5db;
         border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
-      #main-page button:hover { background: #3a3f4b; }
-      #prev-day, #next-day { width: 40px; height: 34px; padding: 0;
+      @media (hover: hover) { #main-page button:hover { background: #f3f4f6; } }
+      #main-page button, #main-page input { -webkit-tap-highlight-color: transparent; }
+      #prev-day, #next-day { width: 36px; height: 34px; padding: 0;
         display: inline-flex; align-items: center; justify-content: center; }
-      #main-page button:disabled { opacity: 0.25; cursor: default;
-        background: #2c3039; }
-      #main-page input { color-scheme: dark; }
-      #game-list { max-width: 720px; margin: 20px auto; padding: 0 16px;
-        display: flex; flex-direction: column; gap: 10px; }
-      #game-list .message { text-align: center; padding: 40px; opacity: 0.8; }
+      #prev-day svg, #next-day svg { width: 12px; height: 12px; fill: currentColor; }
+      #main-page button:disabled { opacity: 0.3; cursor: default; background: #fff; }
+      #main-page input { color-scheme: light; }
+      #game-list { max-width: 760px; margin: 24px auto; padding: 0 16px;
+        display: flex; flex-direction: column; gap: 12px; }
+      #game-list .message { text-align: center; padding: 40px; color: #6b7280; }
       .game-card { display: grid;
         grid-template-columns: minmax(0, 1fr) 70px minmax(0, 1fr) 88px 200px 84px;
-        align-items: center; gap: 16px; padding: 12px 18px; border-radius: 8px;
-        background: #1f232b; border: 1px solid #2c3039; text-align: left;
-        width: 100%; color: inherit; font: inherit; }
+        align-items: center; gap: 16px; padding: 14px 20px; border-radius: 8px;
+        background: #fff; border: 1px solid #e5e7eb; text-align: left;
+        width: 100%; box-sizing: border-box; color: inherit; font: inherit; }
       button.game-card { cursor: pointer; }
-      button.game-card:hover { border-color: #6a7385; background: #262b35; }
+      @media (hover: hover) {
+        button.game-card:hover { border-color: #9ca3af; background: #f9fafb; } }
       .game-card.unavailable { opacity: 0.55; }
       .game-card .team { display: flex; align-items: center; gap: 10px; }
       .game-card .team.home { justify-content: flex-end; }
@@ -51,23 +59,46 @@ const FIRST_DAY = "2009-10-01";
       .game-card .score { font-size: 22px; font-weight: bold; text-align: center; }
       .game-card .state { display: flex; flex-direction: column; align-items: center;
         justify-content: center; gap: 4px; width: 84px; font-size: 13px;
-        color: #b8bfcc; text-align: center; white-space: nowrap; }
-      .game-card .state.live { color: #ff5a5a; font-weight: bold; }
+        color: #4b5563; text-align: center; white-space: nowrap; }
+      .game-card .state.live { color: #dc2626; font-weight: bold; }
       .game-card .type { display: inline-block; min-width: 36px; padding: 2px 6px;
         border-radius: 4px; font-size: 10px; font-weight: bold; letter-spacing: 0.5px;
-        color: #e6e9ef; background: #3c414d; }
-      .game-card .type.t1 { background: #5a4a1e; }
-      .game-card .type.t3 { background: #6b1f2a; }
-      #main-page .type-filter button.active { background: #4a5263; border-color: #8a93a5; }
-      #game-list[data-filter="1"] .game-card:not([data-type="1"]),
-      #game-list[data-filter="2"] .game-card:not([data-type="2"]),
-      #game-list[data-filter="3"] .game-card:not([data-type="3"]),
-      #game-list[data-filter="4"] .game-card:not([data-type="4"]) { display: none; }
-      .game-card .type.t4 { background: #1f4a6b; }
-      .game-card .time, .game-card .venue { font-size: 13px; color: #9aa3b5;
+        color: #374151; background: #f3f4f6; }
+      .game-card .type.t1 { background: #fef3c7; color: #92400e; }
+      .game-card .type.t3 { background: #fee2e2; color: #991b1b; }
+      .game-card .type.t4 { background: #dbeafe; color: #1e40af; }
+      .game-card .time, .game-card .venue { font-size: 13px; color: #6b7280;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .game-card .time { text-align: left; font-variant-numeric: tabular-nums;
         padding-left: 16px; }
+      @media (max-width: 599px) {
+        #main-page header { padding: 10px 12px; gap: 8px; }
+        #main-page h1 { flex: 1 1 auto; margin: 0; order: 0; }
+        #yesterday, #today { order: 1; }
+        #main-page header::after { content: ""; order: 2; flex-basis: 100%;
+          height: 0; margin-bottom: -8px; }
+        #prev-day { order: 3; }
+        #main-page .day-label { order: 3; flex: 1 0 calc(100% - 88px);
+          min-width: 0; font-size: 15px; }
+        #next-day { order: 4; }
+        #day-input { position: absolute; width: 1px; height: 1px; opacity: 0;
+          pointer-events: none; }
+        #pick-day { display: inline-flex; order: 1; padding: 6px 10px; }
+        #pick-day svg { height: 1lh; }
+        #game-list { margin: 16px auto; padding: 0 12px; }
+        .game-card { grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr);
+          grid-template-areas: "away score home" "meta meta state";
+          row-gap: 8px; column-gap: 8px; padding: 12px 14px; }
+        .game-card .team.away { grid-area: away; }
+        .game-card .score { grid-area: score; }
+        .game-card .team.home { grid-area: home; }
+        .game-card .time { grid-area: meta; padding-left: 0; }
+        .game-card .venue { display: none; }
+        .game-card .state { grid-area: state; width: auto; flex-direction: row;
+          justify-self: end; }
+        .game-card img { width: 32px; height: 32px; }
+        .game-card .abbrev { font-size: 17px; }
+      }
       #visualizer-status { position: fixed; top: 50%; left: 50%;
         transform: translate(-50%, -50%); z-index: 1100; padding: 14px 20px;
         background: rgba(20, 20, 20, 0.9); color: #eee; border-radius: 8px;
@@ -80,18 +111,13 @@ const FIRST_DAY = "2009-10-01";
     page.innerHTML = `
       <header>
         <h1>HOKEJ</h1>
-        <button id="prev-day" title="Previous day">&#9664;</button>
+        <button id="prev-day" title="Previous day"><svg viewBox="0 0 12 12"><path d="M10 1 2 6l8 5z"/></svg></button>
         <span class="day-label" id="day-label"></span>
-        <button id="next-day" title="Next day">&#9654;</button>
+        <button id="next-day" title="Next day"><svg viewBox="0 0 12 12"><path d="M2 1l8 5-8 5z"/></svg></button>
         <input type="date" id="day-input" min="2009-10-01" title="Jump to date">
+        <button id="pick-day" title="Jump to date"><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 7h12M5 1.5v3M11 1.5v3"/></svg></button>
+        <button id="yesterday">Yesterday</button>
         <button id="today">Today</button>
-        <span class="type-filter">
-          <button data-filter="" class="active">All</button>
-          <button data-filter="1">Preseason</button>
-          <button data-filter="2">Regular</button>
-          <button data-filter="3">Playoffs</button>
-          <button data-filter="4">All-Star</button>
-        </span>
       </header>
       <div id="game-list"></div>`;
     document.body.appendChild(page);
@@ -104,14 +130,6 @@ const FIRST_DAY = "2009-10-01";
     const dayLabel = page.querySelector("#day-label");
     const dayInput = page.querySelector("#day-input");
     const TYPE_LABELS = { 1: "PRE", 2: "REG", 3: "PO", 4: "ASG" };
-    page.querySelectorAll(".type-filter button").forEach((b) => {
-        b.addEventListener("click", () => {
-            page.querySelectorAll(".type-filter button")
-                .forEach((x) => x.classList.toggle("active", x === b));
-            if (b.dataset.filter) list.dataset.filter = b.dataset.filter;
-            else delete list.dataset.filter;
-        });
-    });
 
     let shownDate = null;
     // stale responses from earlier navigation must not overwrite newer views
@@ -154,9 +172,10 @@ const FIRST_DAY = "2009-10-01";
         abbrev.className = "abbrev";
         abbrev.textContent = team.abbrev;
         const parts = [abbrev];
-        if (team.darkLogo) {
+        const src = team.logo ?? team.darkLogo;
+        if (src) {
             const img = document.createElement("img");
-            img.src = logoUrl(team.darkLogo);
+            img.src = logoUrl(src);
             img.alt = "";
             side === "away" ? parts.unshift(img) : parts.push(img);
         }
@@ -197,13 +216,13 @@ const FIRST_DAY = "2009-10-01";
             ? `${g.awayTeam.score ?? 0} - ${g.homeTeam.score ?? 0}` : "@";
         const state = document.createElement("div");
         state.className = "state " + st.cls;
+        state.append(st.text);
         if (TYPE_LABELS[g.gameType]) {
             const type = document.createElement("span");
             type.className = "type t" + g.gameType;
             type.textContent = TYPE_LABELS[g.gameType];
             state.append(type);
         }
-        state.append(st.text);
         const time = document.createElement("div");
         time.className = "time";
         time.textContent = g.startTimeUTC ? new Date(g.startTimeUTC)
@@ -225,6 +244,7 @@ const FIRST_DAY = "2009-10-01";
 
     async function showList(date) {
         page.hidden = false;
+        setStatsInGame(false);
         pause();
         back.hidden = true;
         vizStatus.hidden = true;
@@ -237,7 +257,7 @@ const FIRST_DAY = "2009-10-01";
         page.querySelector("#prev-day").disabled = date <= FIRST_DAY;
         page.querySelector("#next-day").disabled = !!lastDay && date >= lastDay;
         dayLabel.textContent = new Date(date + "T12:00:00Z").toLocaleDateString(
-            [], { weekday: "short", month: "short", day: "numeric", year: "numeric",
+            [], { weekday: "short", month: "short", day: "2-digit", year: "numeric",
                 timeZone: "UTC" });
         const seq = ++requestSeq;
         message("Loading games...");
@@ -260,6 +280,7 @@ const FIRST_DAY = "2009-10-01";
 
     async function showGame(id) {
         page.hidden = true;
+        setStatsInGame(true);
         back.hidden = false;
         vizStatus.hidden = false;
         vizStatus.textContent = `Loading game ${id}...`;
@@ -311,6 +332,11 @@ const FIRST_DAY = "2009-10-01";
         () => goToDate(shiftDate(shownDate || localToday(), 1)));
     page.querySelector("#today").addEventListener("click",
         () => goToDate(localToday()));
+    page.querySelector("#yesterday").addEventListener("click",
+        () => goToDate(shiftDate(localToday(), -1)));
+    page.querySelector("#pick-day").addEventListener("click", () => {
+        try { dayInput.showPicker(); } catch { dayInput.focus(); }
+    });
     dayInput.addEventListener("change", () => {
         if (DATE_RE.test(dayInput.value)) goToDate(dayInput.value);
     });
@@ -321,6 +347,8 @@ const FIRST_DAY = "2009-10-01";
     });
 
     window.addEventListener("hashchange", route);
+    const initialGame = new URLSearchParams(location.hash.slice(1)).get("game");
+    if (initialGame && GAME_ID_RE.test(initialGame)) page.hidden = true;
     // today's schedule carries the current season's playoffEndDate, the
     // last day the API schedules; route anyway if it fails
     fetchJSON(`/v1/schedule/${localToday()}`)

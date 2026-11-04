@@ -12,7 +12,7 @@
 - [] 3d engine change out of three.js prototype (raylib?)
 
 ## UX
-- [x] proper camera ux (how to move around and set views)
+- [1/2] proper camera ux (how to move around and set views)
 - fix mobile controls
 - fix mobile ux
 - [x] HUD UX is so llm slop

@@ -109,8 +109,15 @@ Object.assign(stats.dom.style, {
 for (const c of stats.dom.children) Object.assign(c.style, { width: "60px", height: "36px" });
 document.body.appendChild(stats.dom);
 
+let statsWanted = false;
+let statsInGame = false;
 export function setStatsVisible(shown) {
-    stats.dom.style.display = shown ? "flex" : "none";
+    statsWanted = shown;
+    stats.dom.style.display = statsWanted && statsInGame ? "flex" : "none";
+}
+export function setStatsInGame(inGame) {
+    statsInGame = inGame;
+    setStatsVisible(statsWanted);
 }
 
 const frameHooks = [];
