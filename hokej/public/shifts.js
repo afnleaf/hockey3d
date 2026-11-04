@@ -1,14 +1,47 @@
-// On-ice players per team at the scrub time, from shiftcharts.
-import { onIceSection as panel } from "./hud.js";
+// On-ice players per team at the scrub time, from shiftcharts. Desktop
+// shows a table; a phone shows a one-line strip per team that taps open
+// into the same table.
+import { shiftsSection as panel } from "./hud.js";
+import { secondsToMmss } from "./parse.js";
 
 const POSITION_ORDER = { G: 0, D: 1, C: 2, R: 3, L: 4 };
+const style = document.createElement("style");
+style.textContent = `
+  #shifts table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+  #shifts td:nth-child(2) { width: 9ch; }
+  #shifts td:nth-child(3) { width: 6ch; }
+  #shifts td:first-child { overflow: hidden; text-overflow: ellipsis; }
+  #shifts td { padding: 1px 4px; white-space: nowrap;
+    font-variant-numeric: tabular-nums; }
+  #shifts td.n { text-align: right; }
+  #shifts tr.on td, #shifts tr.box td { font-weight: 700; }
+  #shifts tr.on td:first-child::before, #shifts tr.box td:first-child::before {
+    content: "\\25CF"; font-size: 9px; margin-right: 3px; color: #7f7; }
+  #shifts tr.box td:first-child::before { visibility: hidden; }
+  #shifts tr.box td { color: #fc6; }
+  #shifts tr.hd td { font-size: 10px; font-weight: 600; color: var(--hud-dim);
+    padding-top: 6px; text-transform: uppercase; }
+  #shifts tr.hd td:first-child { color: var(--hud-fg); }
+  #shifts .sh-strip > div { display: flex; gap: 5px; align-items: baseline;
+    white-space: nowrap; overflow: hidden; }
+  #shifts .sh-strip > div + div { margin-top: 3px; }
+  #shifts .sh-strip .clk { margin-left: auto; }
+  #shifts .sh-strip .first::after { content: " \\25B4"; }
+  #shifts.open .sh-strip .first::after { content: " \\25BE"; }
+`;
+document.head.appendChild(style);
 
 let state = { shifts: [], teams: [], roster: new Map(), duration: 0,
     message: "" };
 
-// teams: [{ id, abbrev, color, logo }]; message replaces the lists when set.
+panel.addEventListener("click", (e) => {
+    if (e.target.closest(".sh-strip")) panel.classList.toggle("open");
+});
+
+// teams: [{ id, abbrev, color }]; message replaces the lists when set.
 export function initShifts(shifts, teams, roster, duration, message) {
     state = { shifts, teams, roster, duration, message };
+    panel.classList.remove("open");
 }
 
 // The final whistle is an end time, so the last instant keeps the
@@ -18,83 +51,117 @@ export function onIceAt(shifts, t, duration) {
         && (t < s.end || (t === duration && s.end === duration)));
 }
 
-function playerRow(playerId, info, fallback, right) {
-    const row = document.createElement("div");
-    row.className = "shift-player";
-    row.style.cssText = "padding-left:9px;white-space:nowrap;"
-        + "display:flex;align-items:baseline";
-    row.title = fallback;
-    row.dataset.playerId = String(playerId);
-    const num = document.createElement("span");
-    num.style.cssText = "display:inline-block;width:2ch;"
-        + "text-align:right;margin-right:6px;"
-        + "font-variant-numeric:tabular-nums";
-    num.textContent = String(info?.number ?? "?");
-    const name = document.createElement("span");
-    name.style.cssText = "flex:1;min-width:0;overflow:hidden;"
-        + "text-overflow:ellipsis";
-    name.textContent = info?.lastName ?? fallback;
-    row.append(num, name, right);
-    return row;
+function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+}
+
+function teamMark(team) {
+    if (!team.logo) {
+        const s = el("span", "hud-sw");
+        s.style.background = team.color;
+        return s;
+    }
+    const img = el("img", "hud-logo");
+    img.src = team.logo;
+    img.alt = team.abbrev;
+    img.style.cssText = "height:2em;vertical-align:middle";
+    return img;
+}
+
+function toiAt(t) {
+    const toi = new Map();
+    for (const s of state.shifts) {
+        if (s.start > t) continue;
+        toi.set(s.playerId, (toi.get(s.playerId) ?? 0)
+            + Math.min(s.end, t) - s.start);
+    }
+    return toi;
+}
+
+function row(table, cls, cells) {
+    const tr = table.insertRow();
+    tr.className = cls;
+    for (const c of cells) {
+        const td = tr.insertCell();
+        if (c instanceof Node) td.append(c);
+        else if (c && typeof c === "object") {
+            td.className = c.cls ?? "";
+            td.append(...c.parts);
+        } else td.textContent = c ?? "";
+    }
+    return tr;
 }
 
 // boxed: [{ teamId, playerId, clock, detail }], soonest release first.
-export function renderShifts(t, boxed = []) {
+// strength: Map teamId -> "PP" | "PK".
+export function renderShifts(t, boxed = [], strength = new Map()) {
     if (state.message) {
-        const m = document.createElement("div");
-        m.className = "hud-dim";
-        m.textContent = state.message;
-        panel.replaceChildren(m);
+        panel.replaceChildren(el("div", "hud-dim", state.message));
         return;
     }
     const on = onIceAt(state.shifts, t, state.duration);
-    const blocks = state.teams.map((team) => {
-        const block = document.createElement("div");
-        block.className = "shift-team";
-        block.dataset.teamId = String(team.id);
-
+    const toi = toiAt(t);
+    const table = el("table", "sh-table");
+    const strip = el("div", "sh-strip");
+    state.teams.forEach((team, i) => {
         const players = on.filter((s) => s.teamId === team.id)
             .map((s) => ({ ...s, info: state.roster.get(s.playerId) }))
             .sort((a, b) => (POSITION_ORDER[a.info?.position] ?? 9)
                 - (POSITION_ORDER[b.info?.position] ?? 9));
-        const head = document.createElement("div");
-        head.className = "hud-team-mark";
-        head.style.cssText = `font-weight:600;border-color:${team.color};`
-            + "display:flex;align-items:flex-start;gap:6px";
-        head.append(`${team.abbrev} (${players.length})`);
-        if (team.logo) {
-            const img = document.createElement("img");
-            img.src = team.logo;
-            img.alt = "";
-            // Negative bottom margin keeps the row at text height; logo hangs down.
-            img.style.cssText = "height:28px;width:auto;flex:none;"
-                + "margin-left:48px;margin-bottom:calc(1lh - 28px);"
-                + "position:relative;z-index:1";
-            head.append(img);
-        }
-        block.append(head);
+        const tag = strength.get(team.id);
+        const title = `${team.abbrev} on ice (${players.length})`
+            + (tag ? ` \u00b7 ${tag}` : "");
+        row(table, "hd", [{ parts: [teamMark(team), " ", title] },
+            { cls: "n", parts: ["shift"] }, { cls: "n", parts: ["TOI"] }]);
+        const skaters = [];
+        const goalies = [];
+        let longest = 0;
         for (const p of players) {
-            const pos = document.createElement("span");
-            pos.style.cssText = "flex:none;width:2ch;margin-left:6px;"
-                + "text-align:center;opacity:0.7";
-            pos.textContent = p.info?.position ?? "";
-            block.append(playerRow(p.playerId, p.info, p.name, pos));
+            const num = p.info?.number ?? "?";
+            const goalie = p.info?.position === "G";
+            const name = `${num} ${p.info?.lastName ?? p.name}`
+                + (goalie ? " G" : "");
+            const elapsed = t - p.start;
+            const shiftCell = [secondsToMmss(elapsed)];
+            if (!goalie) {
+                skaters.push(String(num));
+                longest = Math.max(longest, elapsed);
+            } else goalies.push(`${num}G`);
+            const tr = row(table, "on", [name, { cls: "n", parts: shiftCell },
+                { cls: "n", parts: [secondsToMmss(toi.get(p.playerId) ?? 0)] }]);
+            tr.title = p.info?.name ?? p.name;
         }
-        for (const b of boxed.filter((b) => b.teamId === team.id)) {
+        const teamBox = boxed.filter((b) => b.teamId === team.id);
+        for (const b of teamBox) {
             const info = state.roster.get(b.playerId);
-            const clock = document.createElement("span");
-            clock.style.cssText = "flex:none;margin-left:6px;"
-                + "font-variant-numeric:tabular-nums";
-            clock.textContent = b.clock;
-            const row = playerRow(b.playerId, info, info?.name ?? "bench", clock);
-            row.style.opacity = "0.55";
-            row.title = b.detail;
-            block.append(row);
+            const tr = row(table, "box", [
+                { parts: [`${info?.number ?? "?"} ${info?.lastName ?? "bench"}`] },
+                { cls: "n", parts: [`box ${b.clock}`] },
+                { cls: "n", parts: [secondsToMmss(toi.get(b.playerId) ?? 0)] }]);
+            tr.title = b.detail;
         }
-        return block;
+        // Six skaters plus two stacked minors (double minor) without the block jumping.
+        for (let k = players.length + teamBox.length; k < 8; k++) {
+            row(table, "pad", ["\u00a0", "", ""]);
+        }
+
+        const line = el("div");
+        line.append(teamMark(team), el("b", "", skaters.join(" \u00b7 ")
+            || "\u2013"));
+        const extra = [...goalies, ...teamBox.map((b) => {
+            const info = state.roster.get(b.playerId);
+            return `${info?.number ?? "?"} box ${b.clock}`;
+        })];
+        if (tag) extra.unshift(tag);
+        if (extra.length) line.append(el("span", "hud-dim",
+            "\u00b7 " + extra.join(" \u00b7 ")));
+        const clk = el("span", "clk hud-dim hud-num", secondsToMmss(longest));
+        if (i === 0) clk.classList.add("first");
+        line.append(clk);
+        strip.append(line);
     });
-    const grid = document.createElement("div");
-    grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:4px 8px";
-    grid.append(...blocks);
-    panel.replaceChildren(grid);
+    panel.replaceChildren(strip, table);
 }

@@ -105,9 +105,13 @@ Object.assign(stats.dom.style, {
     zIndex: "3000", left: "auto", right: "0", top: "0",
     display: "flex", opacity: "0.8",
 });
-// Reduced canvases in one row keep the panel above the HUD cards.
+// One row of reduced canvases fits beside the scoreboard on a phone.
 for (const c of stats.dom.children) Object.assign(c.style, { width: "60px", height: "36px" });
 document.body.appendChild(stats.dom);
+
+export function setStatsVisible(shown) {
+    stats.dom.style.display = shown ? "flex" : "none";
+}
 
 const frameHooks = [];
 

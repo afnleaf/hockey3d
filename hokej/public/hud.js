@@ -1,100 +1,105 @@
-// HUD shell: top bar, event strip, filter popover and the shared panel
-// style. Other modules render into the exported slots.
-import { CAMERA_PRESETS, setCameraPreset, presetSnapshots } from "./scene.js";
+// HUD shell: see-through overlay with scoreboard, icon cluster, popovers
+// and the slots other modules render into (legend, shifts, timeline).
+import { CAMERA_PRESETS, setCameraPreset, presetSnapshots, setStatsVisible }
+    from "./scene.js";
 
 const NARROW = 600;
 
 const style = document.createElement("style");
 style.textContent = `
   #hud-container {
-    --hud-bg: rgba(18, 20, 26, 0.82);
-    --hud-border: rgba(255, 255, 255, 0.10);
-    --hud-fg: #e8eaef;
-    --hud-dim: #9aa1ae;
-    --hud-gap: 10px;
-    --hud-radius: 8px;
+    --hud-fg: #fff;
+    --hud-dim: rgba(255, 255, 255, 0.68);
+    --hud-solid: rgba(14, 16, 22, 0.92);
+    --hud-gap: 18px;
     --hud-mono: 'Atkinson Hyperlegible Mono', 'SF Mono', Menlo, monospace;
-    --topbar-h: 48px;
-    --timeline-h: 52px;
+    /* Halo keeps white text legible over ice, boards and yellow seats. */
+    --hud-sh: 0 0 2px #000, 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9),
+      0 0 8px rgba(0, 0, 0, 0.55);
     position: fixed; inset: 0; pointer-events: none; z-index: 1000;
-    font: 13px/1.35 'Atkinson Hyperlegible Next', -apple-system, sans-serif;
-    color: var(--hud-fg);
+    font: 13px/1.25 'Atkinson Hyperlegible Next', -apple-system, sans-serif;
+    color: var(--hud-fg); text-shadow: var(--hud-sh);
+    -webkit-tap-highlight-color: transparent;
   }
-  .hud-panel {
-    background: var(--hud-bg); border: 1px solid var(--hud-border);
-    border-radius: var(--hud-radius); pointer-events: auto;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  .hud-el {
+    pointer-events: auto; border-radius: 8px; padding: 6px 8px;
+    box-sizing: border-box; transition: background 0.15s;
+  }
+  .hud-solid {
+    background: var(--hud-solid); text-shadow: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
   }
   .hud-btn {
-    background: rgba(255, 255, 255, 0.06); color: var(--hud-fg);
-    border: 1px solid var(--hud-border); border-radius: 6px;
-    font: inherit; padding: 4px 8px; cursor: pointer; line-height: 1;
-    min-height: 26px;
+    width: 34px; height: 34px; display: grid; place-items: center;
+    padding: 0; background: none; color: var(--hud-fg); font: inherit;
+    font-size: 17px; line-height: 1; cursor: pointer;
+    border: 1.5px solid rgba(255, 255, 255, 0.75); border-radius: 8px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.6); text-shadow: var(--hud-sh);
   }
-  .hud-btn:hover, .hud-btn[aria-expanded="true"] {
-    background: rgba(255, 255, 255, 0.16);
+  .hud-btn[hidden] { display: none; }
+  .hud-btn svg { filter: drop-shadow(0 0 1.5px #000); }
+  #hud-icons .hud-btn[aria-expanded="true"],
+  #hud-icons .hud-btn[aria-pressed="true"] {
+    background: var(--hud-solid); text-shadow: none;
+  }
+  @media (hover: hover) {
+    .hud-btn:hover { background: var(--hud-solid); text-shadow: none; }
   }
   .hud-mono { font-family: var(--hud-mono); }
+  .hud-num { font-variant-numeric: tabular-nums; }
   .hud-dim { color: var(--hud-dim); }
   .hud-title {
     font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
     text-transform: uppercase; color: var(--hud-dim); margin: 0 0 6px;
   }
-  .hud-team-mark { border-left: 3px solid; padding-left: 6px; }
+  .hud-sw {
+    display: inline-block; flex: none; width: 10px; height: 10px;
+    border-radius: 50%; vertical-align: -1px;
+    box-shadow: 0 0 0 1.5px #fff, 0 0 4px #000;
+  }
 
-  #topbar {
+  #scoreboard {
     position: absolute; top: var(--hud-gap); left: 50%;
-    transform: translateX(-50%); display: flex; flex-direction: column;
-    align-items: center; gap: 4px; padding: 6px 8px;
-    max-width: calc(100% - 2 * var(--hud-gap)); box-sizing: border-box;
+    transform: translateX(-50%); display: grid;
+    grid-template-columns: 56px 60px 44px 150px 44px 60px 56px;
+    align-items: center; justify-items: center; column-gap: 10px;
+    font-weight: 700; white-space: nowrap; cursor: default;
   }
-  #topbar .row { display: flex; align-items: center; gap: 14px; }
-  #topbar .team { display: flex; align-items: center; gap: 10px; }
-  #topbar .team img { height: 44px; width: 44px; object-fit: contain; }
-  #topbar .abbrev { font-weight: 700; font-size: 24px; }
-  #topbar .score {
-    font: 700 32px var(--hud-mono); color: #fff; min-width: 1.2ch;
-    text-align: center;
-  }
-  #topbar .sog { font-size: 15px; color: var(--hud-dim); }
-  #topbar .status {
-    display: flex; flex-direction: column; align-items: center;
-    min-width: 72px;
-  }
-  #topbar .period { font-size: 15px; color: var(--hud-dim); }
-  #topbar .clock { font: 600 24px var(--hud-mono); }
+  #scoreboard .logo { width: 56px; height: 56px; object-fit: contain; }
+  #scoreboard .abbrev { font-size: 22px; letter-spacing: 0.5px;
+    padding-bottom: 2px; border-bottom: 4px solid transparent; }
+  #scoreboard .score { font: 700 30px var(--hud-mono);
+    font-variant-numeric: tabular-nums; text-align: center; }
+  #scoreboard .status { text-align: center; font-size: 15px; line-height: 1.1;
+    font-variant-numeric: tabular-nums; }
+  #scoreboard .sub { font-size: 11px; font-weight: 500; color: var(--hud-dim);
+    margin-top: 2px; }
+  #scoreboard .sog { display: grid; grid-template-columns: 3ch auto 3ch;
+    column-gap: 4px; justify-content: center; }
+  #scoreboard .sog .a { text-align: right; }
+  #scoreboard .sog .h { text-align: left; }
+  #scoreboard .team { display: flex; flex-direction: column; align-items: center; }
+  #scoreboard .pp { display: block; height: 14px; line-height: 14px;
+    margin-top: 3px; font-size: 10px; font-weight: 700; color: #fff; }
 
-  #strip {
-    position: absolute; top: calc(var(--hud-gap) * 2 + var(--topbar-h));
-    left: var(--hud-gap); right: var(--hud-gap); max-height: 200px;
-    display: grid; grid-template-columns: minmax(0, 2fr) auto minmax(0, 1fr);
-    gap: 18px; padding: 8px 12px; box-sizing: border-box; overflow: hidden;
+  #hud-icons {
+    position: absolute; top: var(--hud-gap); left: var(--hud-gap);
+    display: flex; gap: 6px; pointer-events: auto;
   }
-  #strip > section { min-width: 0; }
-  #strip .recent-cols {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px;
+  #game-info {
+    position: absolute; top: calc(var(--hud-gap) + 42px); left: var(--hud-gap);
+    font-size: 11px; color: var(--hud-dim);
   }
-  #event-key {
-    display: grid; grid-auto-flow: column; grid-template-rows: repeat(5, auto);
-    gap: 3px 14px; font-size: 12px; align-content: start;
-  }
-  #event-key .key-row { display: flex; align-items: center; gap: 6px;
-    white-space: nowrap; }
 
-  #filter-popover {
-    position: absolute; top: calc(var(--hud-gap) * 2 + var(--topbar-h));
-    left: 50%; transform: translateX(-50%); padding: 10px 12px;
-    width: max-content; max-width: calc(100% - 2 * var(--hud-gap));
-    box-sizing: border-box;
+  .hud-popover {
+    position: absolute; top: calc(var(--hud-gap) + 42px); left: var(--hud-gap);
+    z-index: 1; padding: 10px 12px; max-width: calc(100% - 2 * var(--hud-gap));
+    width: max-content; max-height: calc(100% - 200px); overflow: auto;
   }
-  #filter-popover, #camera-popover { z-index: 1; }
-  #filter-popover[hidden], #camera-popover[hidden] { display: none; }
+  .hud-popover[hidden], #camera-popover[hidden] { display: none; }
   #camera-popover {
-    position: absolute; top: calc(var(--hud-gap) * 2 + var(--topbar-h));
-    right: var(--hud-gap); padding: 8px; box-sizing: border-box;
     display: grid; grid-template-columns: repeat(2, 160px); gap: 8px;
-    max-width: calc(100% - 2 * var(--hud-gap));
+    padding: 8px;
   }
   #camera-popover button {
     padding: 0; border: 2px solid transparent; border-radius: 4px;
@@ -106,22 +111,58 @@ style.textContent = `
   #camera-popover img { display: block; width: 100%; aspect-ratio: 16 / 9;
     background: #333; }
   #camera-popover span { display: block; padding: 2px 4px; }
-  @media (max-width: ${NARROW - 1}px) {
-    #camera-popover { grid-template-columns: repeat(2, minmax(0, 1fr));
-      left: var(--hud-gap);
-      top: calc(52px + var(--hud-gap) + var(--topbar-h)); }
+
+  #hud-bottom {
+    position: absolute; left: var(--hud-gap); right: var(--hud-gap);
+    bottom: var(--hud-gap); display: flex; flex-direction: column; gap: 6px;
   }
+  #legend {
+    position: fixed; left: var(--hud-gap); top: 20%; width: 340px;
+  }
+  #legend .row {
+    display: grid; grid-template-columns: 44px 24px 16px minmax(0, 1fr);
+    gap: 6px; align-items: center; padding: 2px 0; opacity: 0.8;
+  }
+  #legend .ev-logo { width: 24px; height: 24px; margin: -4px 0; object-fit: contain; }
+  #legend .row:first-child { font-size: 15px; font-weight: 700; opacity: 1; }
+  #legend .what { white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; }
+  #shifts {
+    position: fixed; right: var(--hud-gap); top: 20%; width: 300px;
+    max-height: calc(100% - 190px); overflow: auto;
+  }
+  #shifts .sh-strip { display: none; }
+  #event-key {
+    position: fixed; left: var(--hud-gap); bottom: 160px;
+    display: flex; flex-direction: column; gap: 3px; font-size: 12px;
+  }
+  #event-key .key-row { display: flex; align-items: center; gap: 6px;
+    white-space: nowrap; }
 
   @media (max-width: ${NARROW - 1}px) {
-    #strip { display: none; }
-  }
-  @media (max-width: ${NARROW - 1}px) {
-    /* app.js puts the games button in the top-left corner */
-    #topbar { top: 52px; left: var(--hud-gap); right: var(--hud-gap);
-      transform: none; }
-    #topbar .row { gap: 6px; width: 100%; justify-content: space-between; }
-    #topbar .team img, #topbar .sog { display: none; }
-    #filter-popover { top: calc(52px + var(--hud-gap) + var(--topbar-h)); }
+    #hud-container { --hud-gap: 10px; }
+    #scoreboard { top: var(--hud-gap); column-gap: 5px;
+      grid-template-columns: 36px 46px 34px 110px 34px 46px 36px; }
+    #scoreboard .logo { width: 36px; height: 36px; }
+    #scoreboard .abbrev { font-size: 17px; }
+    #scoreboard .score { font-size: 24px; }
+    #scoreboard .status { font-size: 13px; }
+    #scoreboard .sog { display: none; }
+    #event-key, #legend, #shifts { display: none; }
+    #hud-icons { top: 72px; flex-direction: column; }
+    #game-info { display: none; }
+    .hud-popover { top: 72px; left: 54px;
+      max-width: calc(100% - 54px - var(--hud-gap)); }
+    #camera-popover { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #legend, #shifts { position: static; width: auto; }
+    #legend { font-size: 12px; }
+    #legend .row:first-child { font-size: 13px; }
+    #legend .row:nth-child(n+4) { display: none; }
+    #shifts { font-size: 11px; max-height: none; overflow: visible; }
+    #shifts .sh-strip { display: block; cursor: pointer; }
+    #shifts .sh-table { display: none; }
+    #shifts.open .sh-table { display: table; margin-top: 6px; }
+    #shifts.open { max-height: 50vh; overflow: auto; }
   }
 `;
 document.head.appendChild(style);
@@ -129,30 +170,70 @@ document.head.appendChild(style);
 export const hudContainer = document.createElement("div");
 hudContainer.id = "hud-container";
 
-const topbar = document.createElement("div");
-topbar.id = "topbar";
-topbar.className = "hud-panel";
-topbar.innerHTML = `
-  <div class="row">
-    <button class="hud-btn" id="filter-toggle" title="Event filters"
-      aria-expanded="false">Filters</button>
-    <div class="team away"></div>
-    <div class="status"><span class="period"></span>
-      <span class="clock"></span></div>
-    <div class="team home"></div>
-    <button class="hud-btn" id="camera-toggle" title="Camera views (1-4)"
-      aria-label="Camera views" aria-expanded="false">&#128247;</button>
-  </div>`;
-const teamSlots = [topbar.querySelector(".away"),
-    topbar.querySelector(".home")];
-const periodEl = topbar.querySelector(".period");
-const clockEl = topbar.querySelector(".clock");
+const scoreboard = document.createElement("div");
+scoreboard.id = "scoreboard";
+scoreboard.className = "hud-el";
+scoreboard.innerHTML = `
+  <img class="logo" alt=""><div class="team"><span class="abbrev"></span><span class="pp"></span></div>
+  <span class="score"></span>
+  <div class="status"><div><span class="period"></span>
+    <span class="clock"></span></div>
+    <div class="sub sog"><span class="a"></span><span>SOG</span><span class="h"></span></div>
+  </div>
+  <span class="score"></span><div class="team"><span class="abbrev"></span><span class="pp"></span></div>
+  <img class="logo" alt="">`;
+const logoEls = scoreboard.querySelectorAll(".logo");
+const abbrevEls = scoreboard.querySelectorAll(".abbrev");
+const scoreEls = scoreboard.querySelectorAll(".score");
+const periodEl = scoreboard.querySelector(".period");
+const clockEl = scoreboard.querySelector(".clock");
+const sogEl = scoreboard.querySelector(".sog");
+const sogAway = sogEl.querySelector(".a");
+const sogHome = sogEl.querySelector(".h");
+const ppEls = scoreboard.querySelectorAll(".pp");
+
+const icons = document.createElement("div");
+icons.id = "hud-icons";
+icons.innerHTML = `
+  <button class="hud-btn" id="back-to-list" title="Back to games"
+    aria-label="Back to games">&#8592;</button>
+  <button class="hud-btn" id="filter-toggle" title="Event filters"
+    aria-label="Event filters" aria-expanded="false">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+      stroke="#fff" stroke-width="1.8" stroke-linejoin="round">
+      <path d="M1.5 2.5h13l-5 6v5l-3-1.5v-3.5z"/></svg></button>
+  <button class="hud-btn" id="camera-toggle" title="Camera views (1-4)"
+    aria-label="Camera views" aria-expanded="false">
+    <svg width="18" height="16" viewBox="0 0 18 16" fill="none"
+      stroke="#fff" stroke-width="1.8" stroke-linejoin="round">
+      <path d="M1.5 4.5h3.5l1.5-2h5l1.5 2h3.5v9h-15z"/>
+      <circle cx="9" cy="9" r="2.8"/></svg></button>
+  <button class="hud-btn" id="stats-toggle" title="Render stats"
+    aria-label="Render stats" aria-pressed="true">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+      stroke="#fff" stroke-width="1.8" stroke-linecap="round">
+      <path d="M2 14V9M6 14V3M10 14V7M14 14V5"/></svg></button>`;
+// app.js owns the navigation this button triggers.
+export const backButton = icons.querySelector("#back-to-list");
+
+const gameInfo = document.createElement("div");
+gameInfo.id = "game-info";
+
+const statsToggle = icons.querySelector("#stats-toggle");
+function setStatsShown(shown) {
+    setStatsVisible(shown);
+    statsToggle.setAttribute("aria-pressed", String(shown));
+    localStorage.setItem("hokej.stats", shown ? "1" : "0");
+}
+setStatsShown(localStorage.getItem("hokej.stats") !== "0");
+statsToggle.addEventListener("click", () =>
+    setStatsShown(statsToggle.getAttribute("aria-pressed") !== "true"));
 
 const cameraPanel = document.createElement("div");
 cameraPanel.id = "camera-popover";
-cameraPanel.className = "hud-panel";
+cameraPanel.className = "hud-popover hud-el hud-solid";
 cameraPanel.hidden = true;
-const cameraToggle = topbar.querySelector("#camera-toggle");
+const cameraToggle = icons.querySelector("#camera-toggle");
 const presetButtons = CAMERA_PRESETS.map((p, i) => {
     const b = document.createElement("button");
     b.innerHTML = `<img alt=""><span>${i + 1}. ${p.name}</span>`;
@@ -163,9 +244,12 @@ cameraPanel.append(...presetButtons);
 
 function setCameraOpen(open) {
     // Snapshots on each open so they show the current game's ice logo.
-    if (open) presetSnapshots().forEach((url, i) => {
-        presetButtons[i].querySelector("img").src = url;
-    });
+    if (open) {
+        setFiltersOpen(false);
+        presetSnapshots().forEach((url, i) => {
+            presetButtons[i].querySelector("img").src = url;
+        });
+    }
     cameraPanel.hidden = !open;
     cameraToggle.setAttribute("aria-expanded", String(open));
 }
@@ -174,11 +258,12 @@ cameraToggle.addEventListener("click", () => setCameraOpen(cameraPanel.hidden));
 // filters.js fills this popover
 export const filterPanel = document.createElement("div");
 filterPanel.id = "filter-popover";
-filterPanel.className = "hud-panel";
+filterPanel.className = "hud-popover hud-el hud-solid";
 filterPanel.hidden = true;
-const filterToggle = topbar.querySelector("#filter-toggle");
+const filterToggle = icons.querySelector("#filter-toggle");
 
 function setFiltersOpen(open) {
+    if (open) setCameraOpen(false);
     filterPanel.hidden = !open;
     filterToggle.setAttribute("aria-expanded", String(open));
 }
@@ -197,56 +282,47 @@ document.addEventListener("keydown", (e) => {
     if (CAMERA_PRESETS[i]) { setCameraPreset(i); e.preventDefault(); }
 });
 
-const strip = document.createElement("div");
-strip.id = "strip";
-strip.className = "hud-panel";
-strip.innerHTML = `<section id="recent-events"></section>
-  <section><div id="event-key"></div></section>
-  <section id="shift-overlay"></section>`;
-// shifts.js, viz.js and filters.js render into these
-export const onIceSection = strip.querySelector("#shift-overlay");
-export const recentSection = strip.querySelector("#recent-events");
-export const keySection = strip.querySelector("#event-key");
+// Phone stacks legend, shifts and timeline at the bottom; desktop pulls
+// legend and shifts out to the sides with position: fixed.
+const bottom = document.createElement("div");
+bottom.id = "hud-bottom";
+export const legendSection = document.createElement("div");
+legendSection.id = "legend";
+legendSection.className = "hud-el";
+export const shiftsSection = document.createElement("div");
+export const keySection = document.createElement("div");
+keySection.id = "event-key";
+keySection.className = "hud-el";
+shiftsSection.id = "shifts";
+shiftsSection.className = "hud-el";
+bottom.append(legendSection, shiftsSection);
+// timeline.js appends its bar last
+export const bottomSlot = bottom;
 
-new ResizeObserver(() => hudContainer.style.setProperty("--topbar-h",
-    `${topbar.offsetHeight}px`)).observe(topbar);
-
-hudContainer.append(topbar, filterPanel, cameraPanel, strip);
+hudContainer.append(scoreboard, icons, gameInfo, filterPanel, cameraPanel,
+    keySection, bottom);
 document.body.appendChild(hudContainer);
 
-// teams: [away, home] as { abbrev, color, logo }
-export function setScoreboard(teams) {
+// teams: [away, home] as { abbrev, color }; info is a dim subtitle line.
+export function setScoreboard(teams, info) {
     teams.forEach((t, i) => {
-        const slot = teamSlots[i];
-        const img = document.createElement("img");
-        img.src = t.logo;
-        img.alt = "";
-        const abbrev = document.createElement("span");
-        abbrev.className = "abbrev hud-team-mark";
-        abbrev.style.borderColor = t.color;
-        abbrev.textContent = t.abbrev;
-        const score = document.createElement("span");
-        score.className = "score";
-        const sog = document.createElement("span");
-        sog.className = "sog";
-        sog.title = "Shots on goal";
-        const parts = [img, abbrev, score, sog];
-        slot.replaceChildren(...(i === 0 ? parts : parts.reverse()));
+        const side = i === 0 ? 0 : 1;
+        if (t.logo) logoEls[side].src = t.logo;
+        logoEls[side].alt = t.abbrev;
+        abbrevEls[side].textContent = t.abbrev;
+        abbrevEls[side].style.borderBottomColor = t.color;
     });
+    gameInfo.textContent = info;
 }
 
-// s: { period, clock, awayScore, homeScore, awaySog, homeSog, lastGoal }
+// s: { period, clock, awayScore, homeScore, awaySog, homeSog, lastGoal, pp }
 export function setGameState(s) {
     periodEl.textContent = s.period;
     clockEl.textContent = s.clock;
-    const scores = [s.awayScore, s.homeScore];
-    const sogs = [s.awaySog, s.homeSog];
-    teamSlots.forEach((slot, i) => {
-        const score = slot.querySelector(".score");
-        if (!score) return;
-        score.textContent = scores[i];
-        slot.querySelector(".sog").textContent = `SOG ${sogs[i]}`;
-    });
-    topbar.title = s.lastGoal;
+    scoreEls[0].textContent = s.awayScore;
+    scoreEls[1].textContent = s.homeScore;
+    sogAway.textContent = s.awaySog;
+    sogHome.textContent = s.homeSog;
+    ppEls.forEach((el, i) => { el.textContent = s.ppSide === i ? s.pp : ""; });
+    scoreboard.title = s.lastGoal;
 }
-

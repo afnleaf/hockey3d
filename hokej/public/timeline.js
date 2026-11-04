@@ -1,8 +1,9 @@
 // Scrubber with play/pause and speed. Time is timeline seconds from
 // parse.js (period start + time in period).
 import { onFrame } from "./scene.js";
-import { hudContainer } from "./hud.js";
+import { bottomSlot } from "./hud.js";
 import { iconSvg } from "./icons.js";
+import { secondsToMmss } from "./parse.js";
 
 const MIN_SPEED = 1;
 const MAX_SPEED = 120;
@@ -16,44 +17,86 @@ const toSlider = (s) => Math.round(Math.log(s / MIN_SPEED) / LOG_SPAN
     * SLIDER_STEPS);
 
 const ICON_PX = 16;
-const TICK_PX = 8;
+// Gap between period bars, in px.
+const PERIOD_GAP = 6;
+
+const style = document.createElement("style");
+// Glyph characters sit off-centre in the button; SVG paths do not.
+const PLAY_SVG = '<svg viewBox="0 0 12 12"><path d="M2.5 1 L11 6 L2.5 11 Z"/></svg>';
+const PAUSE_SVG = '<svg viewBox="0 0 12 12"><path d="M2 1h3v10H2zM7 1h3v10H7z"/></svg>';
+style.textContent = `
+  #timeline .tl-row { display: flex; align-items: center; gap: 10px;
+    font-weight: 700; }
+  #timeline-play { width: 30px; height: 30px; padding: 0; }
+  #timeline-play svg { display: block; width: 12px; height: 12px; fill: currentColor; }
+  #timeline-speed { width: 70px; margin: 0; accent-color: #fff; }
+  #timeline-speed-label { min-width: 4ch; cursor: text; }
+  #timeline .tl-hint { font-weight: 400; font-size: 12px; }
+  #timeline .tl-time { margin-left: auto; font-variant-numeric: tabular-nums; }
+  #timeline-track { position: relative; height: 56px; margin: 2px 8px 0;
+    cursor: pointer; touch-action: none; }
+  #timeline-track > * { position: absolute; }
+  #timeline-track .per { top: 24px; height: 4px; border-radius: 2px;
+    background: rgba(255, 255, 255, 0.45); box-shadow: 0 0 3px #000; }
+  #timeline-track .done { top: 24px; left: 0; height: 4px; border-radius: 2px;
+    background: #fff; pointer-events: none; }
+  #timeline-track .lbl { top: 42px; font-size: 10px; font-weight: 500;
+    pointer-events: none; }
+  #timeline-track .tk { width: 2px; margin-left: -1px; height: 9px;
+    box-shadow: 0 0 2px #000; }
+  #timeline-track .tk.a { top: 14px; }
+  #timeline-track .tk.h { top: 29px; }
+  #timeline-track .tk.n { top: 14px; height: 24px; opacity: 0.5; }
+  #timeline-track .mj { width: ${ICON_PX}px; height: ${ICON_PX}px;
+    margin-left: -${ICON_PX / 2}px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; z-index: 2;
+    box-shadow: 0 0 0 1.5px #fff, 0 0 4px #000; }
+  #timeline-track .mj.a { top: -3px; }
+  #timeline-track .mj.h, #timeline-track .mj.n { top: 39px; }
+  #timeline-track .badge { position: absolute; top: -7px; right: -8px;
+    font-size: 9px; line-height: 11px; min-width: 11px; padding: 0 2px;
+    border-radius: 6px; text-align: center; background: #fff; color: #000;
+    font-weight: 700; text-shadow: none; }
+  #timeline-track .head { top: 15px; width: 3px; height: 22px;
+    margin-left: -1.5px; background: #ff0; box-shadow: 0 0 4px #000;
+    pointer-events: none; z-index: 3; }
+  @media (max-width: 599px) {
+    #timeline .tl-hint { display: none; }
+    #timeline .tl-row { font-size: 12px; }
+  }
+`;
+document.head.appendChild(style);
 
 const bar = document.createElement("div");
 bar.id = "timeline";
-bar.className = "hud-panel";
-bar.style.cssText = `
-  position: absolute; bottom: var(--hud-gap); left: var(--hud-gap);
-  right: var(--hud-gap); display: flex; align-items: center;
-  gap: 12px; padding: 6px 12px;
-`;
+bar.className = "hud-el";
 bar.innerHTML = `
-  <span style="display:flex;align-items:center;gap:8px;flex:none">
-    <button id="timeline-play" class="hud-btn" title="Play/pause"
-      style="width:34px;height:30px">&#9654;</button>
-  </span>
-  <span style="display:flex;align-items:center;gap:6px;flex:none">
+  <div class="tl-row">
+    <button id="timeline-play" class="hud-btn" title="Play/pause (space, k)"
+      aria-label="Play/pause">${PLAY_SVG}</button>
     <input id="timeline-speed" type="range" title="Playback speed (log scale)"
       min="0" max="${SLIDER_STEPS}" step="1"
-      value="${toSlider(DEFAULT_SPEED)}" style="width:80px;margin:0">
-    <span id="timeline-speed-label" class="hud-mono hud-dim"
-      title="Click to type a speed"
-      style="min-width:4ch;cursor:text">${DEFAULT_SPEED}x</span>
-  </span>
-  <div style="flex:1 1 300px;min-width:0;position:relative">
-    <div id="timeline-markers"
-      style="position:relative;margin:0 7px;height:${ICON_PX + 14}px"></div>
-    <input id="timeline-range" type="range" min="0" max="0" step="1"
-      value="0" style="width:100%;margin:0;display:block">
-  </div>`;
-hudContainer.appendChild(bar);
-new ResizeObserver(() => hudContainer.style.setProperty("--timeline-h",
-    `${bar.offsetHeight}px`)).observe(bar);
+      value="${toSlider(DEFAULT_SPEED)}">
+    <span id="timeline-speed-label" class="hud-num"
+      title="Click to type a speed (&lt; &gt; step)">${DEFAULT_SPEED}x</span>
+    <span class="tl-hint hud-dim">space play &middot; &larr;/&rarr; 5s
+      &middot; j/l 10s &middot; &lt; &gt; speed &middot; 1-4 camera
+      &middot; drag rotate &middot; right-drag pan &middot; wheel zoom
+      &middot; double-click fly in</span>
+    <span class="tl-time"></span>
+  </div>
+  <div id="timeline-track"></div>`;
+bottomSlot.appendChild(bar);
 
 const playBtn = bar.querySelector("#timeline-play");
-const range = bar.querySelector("#timeline-range");
-const markers = bar.querySelector("#timeline-markers");
+const track = bar.querySelector("#timeline-track");
+const timeLabel = bar.querySelector(".tl-time");
 const speedSlider = bar.querySelector("#timeline-speed");
 const speedLabel = bar.querySelector("#timeline-speed-label");
+const done = document.createElement("div");
+done.className = "done";
+const head = document.createElement("div");
+head.className = "head";
 let speed = DEFAULT_SPEED;
 
 const roundSpeed = (s) => s < 10 ? Math.round(s * 10) / 10 : Math.round(s);
@@ -96,16 +139,30 @@ let time = 0;
 let playing = false;
 let lastFrame = null;
 let listener = () => {};
+let markerItems = [];
+let periods = [];
+
+const pct = (t) => duration ? t / duration * 100 : 0;
+
+function periodTag(t) {
+    let current = periods[0];
+    for (const p of periods) if (p.start <= t) current = p;
+    if (!current) return "";
+    return current.type === "REG" ? `P${current.number}` : current.type;
+}
 
 function emit() {
-    range.value = String(Math.floor(time));
+    done.style.width = `${pct(time)}%`;
+    head.style.left = `${pct(time)}%`;
+    timeLabel.textContent = `${periodTag(time)} \u00b7 `
+        + `${secondsToMmss(time)} / ${secondsToMmss(duration)}`;
     listener(time);
 }
 
 function setPlaying(p) {
     playing = p;
     lastFrame = null;
-    playBtn.innerHTML = p ? "&#10073;&#10073;" : "&#9654;";
+    playBtn.innerHTML = p ? PAUSE_SVG : PLAY_SVG;
 }
 
 playBtn.addEventListener("click", () => {
@@ -143,9 +200,20 @@ addEventListener("keydown", (e) => {
 document.addEventListener("visibilitychange", () => {
     if (document.hidden && playing) setPlaying(false);
 });
-range.addEventListener("input", () => {
-    time = Number(range.value);
-    emit();
+
+function timeAtX(clientX) {
+    const r = track.getBoundingClientRect();
+    return r.width ? (clientX - r.left) / r.width * duration : 0;
+}
+
+// Markers handle their own clicks; anywhere else on the track scrubs.
+track.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.target.closest(".mj, .tk")) return;
+    track.setPointerCapture(e.pointerId);
+    setTime(timeAtX(e.clientX));
+});
+track.addEventListener("pointermove", (e) => {
+    if (track.hasPointerCapture(e.pointerId)) setTime(timeAtX(e.clientX));
 });
 
 onFrame((now) => {
@@ -164,34 +232,37 @@ export function initTimeline(total, onChange) {
     setPlaying(false);
     duration = total;
     listener = onChange;
-    range.max = String(total);
     time = total;
     emit();
 }
 
-let markerItems = [];
-let periods = [];
-
-// items: [{ t, type, color, title, major }]; majors share one row and
-// merge into a counted badge when they would overlap; minors are ticks.
-// periods: [{ start, length, type, number }] draw dividers and labels.
+// items: [{ t, type, color, title, major, side }]; side 0 = away (above
+// the bar), 1 = home (below), null = no team. Majors merge into a counted
+// badge when they would overlap; minors are ticks.
+// periods: [{ start, length, type, number }] draw the bars and labels.
 export function setMarkers(items, gamePeriods = []) {
     markerItems = items;
     periods = gamePeriods;
     layoutMarkers();
+    emit();
 }
+
+const sideClass = (s) => s === 0 ? "a" : s === 1 ? "h" : "n";
 
 function clusterMajors(width) {
     const majors = markerItems.filter((m) => m.major)
         .sort((a, b) => a.t - b.t);
-    const clusters = [];
+    const rows = new Map();
     for (const m of majors) {
         const x = duration ? m.t / duration * width : 0;
+        const row = sideClass(m.side);
+        if (!rows.has(row)) rows.set(row, []);
+        const clusters = rows.get(row);
         const last = clusters.at(-1);
         if (last && x - last.x < ICON_PX + 2) last.items.push(m);
-        else clusters.push({ x, items: [m] });
+        else clusters.push({ x, row, items: [m] });
     }
-    return clusters;
+    return [...rows.values()].flat();
 }
 
 function seek(t) {
@@ -239,64 +310,59 @@ function attachTip(el, items) {
 }
 
 function layoutMarkers() {
-    const width = markers.clientWidth;
-    const pct = (t) => duration ? t / duration * 100 : 0;
+    const width = track.clientWidth;
     const els = [];
-    for (const p of periods) {
-        const tag = document.createElement("span");
-        tag.className = "hud-dim";
-        tag.textContent = p.type === "REG" ? `P${p.number}` : p.type;
-        tag.style.cssText = `position:absolute;top:0;font-size:10px;`
-            + `left:calc(${pct(p.start)}% + 4px)`;
-        els.push(tag);
-        if (p.start > 0) {
-            const line = document.createElement("span");
-            line.style.cssText = `position:absolute;top:0;bottom:-18px;`
-                + `width:1px;left:${pct(p.start)}%;`
-                + `background:rgba(255,255,255,0.35)`;
-            els.push(line);
-        }
-    }
+    periods.forEach((p, i) => {
+        // Zero-length shootout slot still gets a label but no bar.
+        const per = document.createElement("div");
+        per.className = "per";
+        const inset = width ? PERIOD_GAP / 2 / width * 100 : 0;
+        const left = pct(p.start) + (i ? inset : 0);
+        const right = pct(p.start + p.length)
+            - (i < periods.length - 1 ? inset : 0);
+        per.style.left = `${left}%`;
+        per.style.width = `${Math.max(0, right - left)}%`;
+        const lbl = document.createElement("div");
+        lbl.className = "lbl hud-dim";
+        lbl.textContent = p.type === "REG" ? `P${p.number}` : p.type;
+        lbl.style.left = `calc(${pct(p.start)}% + 2px)`;
+        els.push(per, lbl);
+    });
+    els.push(done);
     for (const m of markerItems) {
         if (m.major) continue;
-        const el = document.createElement("span");
+        const el = document.createElement("div");
+        el.className = `tk ${sideClass(m.side)}`;
         attachTip(el, [m]);
-        el.style.cssText = `position:absolute;bottom:0;width:2px;`
-            + `margin-left:-1px;height:${TICK_PX}px;cursor:pointer;`
-            + `left:${pct(m.t)}%;background:${m.color};opacity:0.7`;
+        el.style.left = `${pct(m.t)}%`;
+        el.style.background = m.color;
         el.addEventListener("click", () => seek(m.t));
         els.push(el);
     }
     for (const c of clusterMajors(width)) {
         const first = c.items[0];
-        const el = document.createElement("span");
-        el.className = "timeline-marker";
+        const el = document.createElement("div");
+        el.className = `mj ${c.row}`;
         el.dataset.type = first.type;
         attachTip(el, c.items);
-        el.style.cssText = `position:absolute;bottom:0;display:flex;`
-            + `align-items:center;justify-content:center;cursor:pointer;`
-            + `z-index:2;border-radius:50%;width:${ICON_PX}px;`
-            + `height:${ICON_PX}px;margin-left:-${ICON_PX / 2}px;`
-            + `left:${width ? c.x / width * 100 : 0}%;`
-            + `background:${first.color};box-shadow:0 0 0 1px #fff`;
+        el.style.left = `${width ? c.x / width * 100 : 0}%`;
+        el.style.background = first.color;
         el.innerHTML = iconSvg(first.type, "#fff", ICON_PX - 4);
         if (c.items.length > 1) {
             const badge = document.createElement("span");
+            badge.className = "badge";
             badge.textContent = String(c.items.length);
-            badge.style.cssText = "position:absolute;top:-7px;right:-8px;"
-                + "font-size:9px;line-height:11px;min-width:11px;"
-                + "padding:0 2px;border-radius:6px;text-align:center;"
-                + "background:#fff;color:#000;font-weight:700";
             el.append(badge);
         }
         el.addEventListener("click", () => seek(first.t));
         els.push(el);
     }
+    els.push(head);
     hideTip();
-    markers.replaceChildren(...els);
+    track.replaceChildren(...els);
 }
 
-new ResizeObserver(layoutMarkers).observe(markers);
+new ResizeObserver(layoutMarkers).observe(track);
 
 export function setTime(t) {
     time = Math.max(0, Math.min(duration, t));

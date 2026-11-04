@@ -13,7 +13,9 @@
 
 ## UX
 - [x] proper camera ux (how to move around and set views)
-- [] HUD UX is so llm slop
+- fix mobile controls
+- fix mobile ux
+- [x] HUD UX is so llm slop
 - [] mobile
 - [] full diagetic
     - box view paper work notes menu/game picker

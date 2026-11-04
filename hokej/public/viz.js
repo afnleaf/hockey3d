@@ -7,8 +7,7 @@ import { logoUrl } from "./relay.js";
 import { loadEvents, applyVisibility, gameColors, pickEvent, setPinned }
     from "./events.js";
 import { renderer } from "./scene.js";
-import { setScoreboard, setGameState, recentSection }
-    from "./hud.js";
+import { setScoreboard, setGameState, legendSection } from "./hud.js";
 import { initTimeline, setMarkers } from "./timeline.js";
 import { initFilters, passesFilters, showVisibleCount, isShowAll }
     from "./filters.js";
@@ -44,11 +43,18 @@ function periodName(p) {
     return `Period ${p.number}`;
 }
 
+function periodShort(p) {
+    if (p.type !== "REG") return p.type;
+    return `${p.number}${["st", "nd", "rd"][p.number - 1] ?? "th"}`;
+}
+
 function isFinal() {
     return game.gameState === "OFF" || game.gameState === "FINAL";
 }
 
-function hudState(t) {
+// pp: "PP ABV m:ss" for the side with fewer players in the box, timed by
+// the shorthanded side's soonest release.
+function hudState(t, boxed) {
     let awayScore = 0;
     let homeScore = 0;
     let awaySog = 0;
@@ -75,12 +81,26 @@ function hudState(t) {
         homeScore = game.home.score ?? homeScore;
     }
     const p = periodAt(t);
-    let period = periodName(p);
+    let period = periodShort(p);
     if (ended) period = p.type === "REG" ? "Final" : `Final (${p.type})`;
     const clock = p.type === "SO" ? ""
         : secondsToMmss(p.length - Math.min(p.length, t - p.start));
+    const pp = ended ? null : powerPlay(boxed);
     return { period, clock, awayScore, homeScore, awaySog, homeSog,
+        pp: pp ? `PP ${pp.clock}` : "",
+        ppSide: pp ? teams.findIndex((tm) => tm.id === pp.teamId) : -1,
         lastGoal: lastGoal ? goalText(lastGoal) : "" };
+}
+
+// Misconducts box a player without shorting the team.
+const SHORTING = new Set(["MIN", "MAJ", "BEN"]);
+
+function powerPlay(boxed) {
+    const [a, h] = teams.map((tm) => boxed.filter((b) => b.teamId === tm.id
+        && SHORTING.has(b.kind)));
+    if (a.length === h.length) return null;
+    const [pp, pk] = a.length < h.length ? [teams[0], h] : [teams[1], a];
+    return { teamId: pp.id, shortId: pk[0].teamId, clock: pk[0].clock };
 }
 
 function goalText(g) {
@@ -105,75 +125,38 @@ function refreshEvents() {
 }
 
 // Covers every play, not only drawable ones, so stoppages and period
-// marks also appear; the type/team filters still apply.
+// marks also appear; the type/team filters still apply. Newest first.
 function renderRecent(t) {
-    const recent = [];
+    const rows = [];
     for (let i = game.plays.length - 1; i >= 0
-        && recent.length < RECENT_COUNT; i--) {
+        && rows.length < RECENT_COUNT; i--) {
         const p = game.plays[i];
-        if (p.gameSeconds <= t && passesFilters(p)) recent.push(p);
-    }
-    const cols = document.createElement("div");
-    cols.className = "recent-cols";
-    const half = Math.ceil(RECENT_COUNT / 2);
-    const tables = [0, 1].map(() => {
-        const t = document.createElement("table");
-        t.style.cssText = "border-collapse:collapse;width:100%;"
-            + "table-layout:fixed;font-size:12px";
-        return t;
-    });
-    cols.append(...tables);
-    recent.forEach((p, i) => {
-        const table = tables[i < half ? 0 : 1];
+        if (p.gameSeconds > t || !passesFilters(p)) continue;
         const team = teamOf(p.teamId);
-        const row = table.insertRow();
-        row.className = "recent-row";
-        const time = row.insertCell();
-        time.className = "hud-mono hud-dim";
-        time.style.cssText = "width:9ch;white-space:nowrap";
-        time.textContent = timeLabel(p.gameSeconds);
-        const what = row.insertCell();
-        what.className = "hud-team-mark";
-        what.style.cssText = `border-color:${team?.color ?? "transparent"};`
-            + "white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
-        const icon = iconElement(p.type, "#cfd3db", 13);
-        icon.style.verticalAlign = "-2px";
-        icon.style.marginRight = "5px";
-        what.append(icon, p.type.replace(/-/g, " "));
-        const who = row.insertCell();
-        who.style.cssText = "white-space:nowrap;overflow:hidden;"
-            + "text-overflow:ellipsis;width:36%";
-        const name = game.roster.get(p.playerId)?.lastName ?? "";
-        if (team?.logo) {
-            const logo = document.createElement("img");
-            logo.src = team.logo;
-            logo.alt = team.abbrev;
-            logo.style.cssText = "height:14px;vertical-align:-3px;"
-                + "margin-right:5px";
-            who.append(logo);
-        } else if (team) {
-            who.append(team.abbrev + " ");
-        }
-        const num = game.roster.get(p.playerId)?.number;
-        if (num != null) {
-            const n = document.createElement("span");
-            n.style.cssText = "display:inline-block;width:2ch;"
-                + "text-align:right;margin-right:5px;"
-                + "font-variant-numeric:tabular-nums";
-            n.textContent = String(num);
-            who.append(n);
-        }
-        who.append(name);
-        who.title = [team?.abbrev, name].filter(Boolean).join(" ");
-        for (const c of row.cells) c.style.padding = "2px 4px 2px 0";
-        what.style.paddingLeft = "6px";
-    });
-    if (!recent.length) {
-        const c = tables[0].insertRow().insertCell();
-        c.className = "hud-dim";
-        c.textContent = "No events yet.";
+        const row = document.createElement("div");
+        row.className = "row";
+        const when = document.createElement("span");
+        when.className = "hud-num";
+        when.textContent = timeLabel(p.gameSeconds).split(" ")[1];
+        when.title = timeLabel(p.gameSeconds);
+        const sw = document.createElement(team?.logo ? "img" : "span");
+        sw.className = "ev-logo";
+        if (team?.logo) { sw.src = team.logo; sw.alt = team.abbrev; }
+        const what = document.createElement("span");
+        what.className = "what";
+        const who = playerText(p.playerId);
+        what.textContent = typeLabel(p) + (who ? ` \u00b7 ${who}` : "");
+        row.title = [team?.abbrev, what.textContent].filter(Boolean).join(" ");
+        row.append(when, sw, iconElement(p.type, "#fff", 14), what);
+        rows.push(row);
     }
-    recentSection.replaceChildren(cols);
+    if (!rows.length) {
+        const none = document.createElement("div");
+        none.className = "hud-dim";
+        none.textContent = "No events yet.";
+        rows.push(none);
+    }
+    legendSection.replaceChildren(...rows);
 }
 
 const DETAIL_PLAYERS = [
@@ -336,7 +319,7 @@ function buildPenalties() {
                 if (g) end = g.gameSeconds;
             }
             const playerId = d.committedByPlayerId ?? d.servedByPlayerId;
-            return { start, end, teamId, playerId,
+            return { start, end, teamId, playerId, kind: d.typeCode,
                 desc: d.descKey ?? "penalty", minutes: d.duration };
         });
 }
@@ -345,7 +328,7 @@ function buildPenalties() {
 function boxedAt(t) {
     return penalties.filter((p) => p.start <= t && t < p.end)
         .sort((a, b) => a.end - b.end)
-        .map((p) => ({ teamId: p.teamId, playerId: p.playerId,
+        .map((p) => ({ teamId: p.teamId, playerId: p.playerId, kind: p.kind,
             clock: secondsToMmss(p.end - t),
             detail: `${p.desc.replace(/-/g, " ")} (${p.minutes})` }));
 }
@@ -354,7 +337,9 @@ function timelineMarkers() {
     return game.plays.filter((p) => TIMELINE_TYPES.has(p.type)).map((p) => {
         const team = teamOf(p.teamId);
         const major = p.type === "goal" || p.type === "penalty";
-        return { t: p.gameSeconds, type: p.type, major,
+        const side = p.teamId === game.away.id ? 0
+            : p.teamId === game.home.id ? 1 : null;
+        return { t: p.gameSeconds, type: p.type, major, side,
             color: team?.color ?? "#666",
             title: `${timeLabel(p.gameSeconds)} ${team?.abbrev ?? ""} `
                 + typeLabel(p) };
@@ -364,9 +349,11 @@ function timelineMarkers() {
 function onTime(t) {
     time = t;
     refreshEvents();
-    setGameState(hudState(t));
     const boxed = boxedAt(t);
-    renderShifts(t, boxed);
+    setGameState(hudState(t, boxed));
+    const pp = powerPlay(boxed);
+    const strength = new Map(pp ? [[pp.teamId, "PP"], [pp.shortId, "PK"]] : []);
+    renderShifts(t, boxed, strength);
     setPenaltyBoxOccupants(boxed.map((b) => ({
         box: b.teamId === game.home.id ? 0 : 1,
         color: teamOf(b.teamId)?.color ?? "#888",
@@ -381,7 +368,7 @@ export function loadGame(pbp, shiftJson, shiftError) {
         id: t.id,
         abbrev: t.abbrev,
         color: "#" + colors.get(t.id).toString(16).padStart(6, "0"),
-        logo: logoUrl(t.darkLogo),
+        logo: logoUrl(t.darkLogo ?? t.logo),
     }));
     renderCenterLogo(logoUrl(game.home.logo));
     setBenchColors(teams[1].color, teams[0].color);
@@ -389,7 +376,11 @@ export function loadGame(pbp, shiftJson, shiftError) {
     pinnedPlay = null;
     rinkTip.style.display = "none";
     loadEvents(game, colors);
-    setScoreboard(teams);
+    const date = pbp.gameDate ? new Date(pbp.gameDate + "T12:00:00Z")
+        .toLocaleDateString([], { weekday: "short", month: "short",
+            day: "numeric", timeZone: "UTC" }) : "";
+    setScoreboard(teams, [date, pbp.venue?.default].filter(Boolean)
+        .join(" \u00b7 "));
     initFilters(game.events, teams, refreshEvents);
     const shifts = shiftJson ? parseShifts(shiftJson, game) : [];
     const message = shiftError ? `Shift data unavailable: ${shiftError}`

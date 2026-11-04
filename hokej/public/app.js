@@ -1,6 +1,7 @@
 // Main page (daily game list) and visualizer routing.
 import { loadGame } from "./viz.js";
 import { pause } from "./timeline.js";
+import { backButton as back } from "./hud.js";
 import { RELAY_BASE, logoUrl } from "./relay.js";
 
 // Routes: "" = game list, "#date=YYYY-MM-DD" = list for a day,
@@ -23,10 +24,10 @@ const FIRST_DAY = "2009-10-01";
       #main-page h1 { margin: 0 24px 0 0; font-size: 20px; letter-spacing: 2px; }
       #main-page .day-label { min-width: 210px; text-align: center;
         font-size: 17px; font-weight: bold; }
-      #main-page button, #main-page input, #back-to-list {
+      #main-page button, #main-page input {
         background: #2c3039; color: #eee; border: 1px solid #3c414d;
         border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
-      #main-page button:hover, #back-to-list:hover { background: #3a3f4b; }
+      #main-page button:hover { background: #3a3f4b; }
       #prev-day, #next-day { width: 40px; height: 34px; padding: 0;
         display: inline-flex; align-items: center; justify-content: center; }
       #main-page button:disabled { opacity: 0.25; cursor: default;
@@ -67,8 +68,6 @@ const FIRST_DAY = "2009-10-01";
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .game-card .time { text-align: left; font-variant-numeric: tabular-nums;
         padding-left: 16px; }
-      #back-to-list { position: fixed; top: 20px; left: 20px; z-index: 1100;
-        font: 15px 'Atkinson Hyperlegible Next', sans-serif; }
       #visualizer-status { position: fixed; top: 50%; left: 50%;
         transform: translate(-50%, -50%); z-index: 1100; padding: 14px 20px;
         background: rgba(20, 20, 20, 0.9); color: #eee; border-radius: 8px;
@@ -97,12 +96,9 @@ const FIRST_DAY = "2009-10-01";
       <div id="game-list"></div>`;
     document.body.appendChild(page);
 
-    const back = document.createElement("button");
-    back.id = "back-to-list";
-    back.textContent = "\u2190 Games";
     const vizStatus = document.createElement("div");
     vizStatus.id = "visualizer-status";
-    document.body.append(back, vizStatus);
+    document.body.append(vizStatus);
 
     const list = page.querySelector("#game-list");
     const dayLabel = page.querySelector("#day-label");
