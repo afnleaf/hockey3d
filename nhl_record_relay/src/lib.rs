@@ -2,7 +2,7 @@ use axum::{
     Router,
     extract::{Path, State},
     extract::Request,
-    http::{HeaderName, HeaderValue, Method, StatusCode, header},
+    http::{HeaderName, Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
@@ -43,12 +43,11 @@ const BUCKETS_MAX: usize = 10_000;
 
 pub struct Config {
     pub cache_dir: PathBuf,
-    pub allowed_origins: Vec<String>,
     pub web_base: String,
     pub stats_base: String,
     pub assets_base: String,
     pub index: Option<PathBuf>,
-    /// Behind a public tunnel: no page at `/`, no `Origin: null`.
+    /// Behind a public tunnel: no page at `/`.
     pub public: bool,
     pub rate_burst: u32,
     pub rate_per_sec: f64,
@@ -272,19 +271,12 @@ impl Relay {
     }
 }
 
-// CORS alone only hides responses from foreign pages; this stops their
-// requests from costing upstream fetches or rate budget.
 async fn guard(State(r): State<Arc<Relay>>, req: Request, next: Next) -> Response {
     let Ok(_slot) = r.inflight.try_acquire() else {
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     };
     if !r.take_token(client_ip(&req)) {
         return StatusCode::TOO_MANY_REQUESTS.into_response();
-    }
-    if let Some(o) = req.headers().get(header::ORIGIN) {
-        if !r.cfg.allowed_origins.iter().any(|a| o == a.as_str()) {
-            return StatusCode::FORBIDDEN.into_response();
-        }
     }
     next.run(req).await
 }
@@ -379,10 +371,8 @@ async fn logo(State(r): State<Arc<Relay>>, Path(file): Path<String>) -> Response
 
 pub fn app(cfg: Config) -> Router {
     std::fs::create_dir_all(&cfg.cache_dir).expect("cache dir");
-    let origins: Vec<HeaderValue> =
-        cfg.allowed_origins.iter().map(|o| o.parse().expect("allowed origin")).collect();
     let cors = CorsLayer::new()
-        .allow_origin(origins)
+        .allow_origin(tower_http::cors::Any)
         .allow_methods([Method::GET])
         .allow_headers([HeaderName::from_static(APP_HEADER)])
         .max_age(Duration::from_secs(86400));

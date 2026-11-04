@@ -54,9 +54,58 @@ function hex(c) {
     return "#" + c.toString(16).padStart(6, "0");
 }
 
-function rgbDistance(a, b) {
-    const d = (s) => ((a >> s) & 255) - ((b >> s) & 255);
-    return Math.hypot(d(16), d(8), d(0));
+function lab(c) {
+    const lin = (v) => {
+        v /= 255;
+        return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+    };
+    const r = lin((c >> 16) & 255), g = lin((c >> 8) & 255), b = lin(c & 255);
+    const x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047;
+    const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
+    const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+    return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+}
+
+// CIEDE2000, Sharma, Wu, Dalal (2005). RGB distance rated BOS gold vs
+// VGK gold as distinct; perceived difference does not.
+export function deltaE2000(c1, c2) {
+    const [L1, a1, b1] = lab(c1), [L2, a2, b2] = lab(c2);
+    const rad = Math.PI / 180;
+    const C1 = Math.hypot(a1, b1), C2 = Math.hypot(a2, b2);
+    const Cm = (C1 + C2) / 2;
+    const G = 0.5 * (1 - Math.sqrt(Cm ** 7 / (Cm ** 7 + 25 ** 7)));
+    const a1p = a1 * (1 + G), a2p = a2 * (1 + G);
+    const C1p = Math.hypot(a1p, b1), C2p = Math.hypot(a2p, b2);
+    const hp = (b, a) => {
+        if (a === 0 && b === 0) return 0;
+        const h = Math.atan2(b, a) / rad;
+        return h < 0 ? h + 360 : h;
+    };
+    const h1p = hp(b1, a1p), h2p = hp(b2, a2p);
+    const dLp = L2 - L1, dCp = C2p - C1p;
+    let dhp = 0;
+    if (C1p * C2p !== 0) {
+        dhp = h2p - h1p;
+        if (dhp > 180) dhp -= 360;
+        else if (dhp < -180) dhp += 360;
+    }
+    const dHp = 2 * Math.sqrt(C1p * C2p) * Math.sin((dhp / 2) * rad);
+    const Lmp = (L1 + L2) / 2, Cmp = (C1p + C2p) / 2;
+    let hmp = h1p + h2p;
+    if (C1p * C2p !== 0) {
+        if (Math.abs(h1p - h2p) > 180) hmp += h1p + h2p < 360 ? 360 : -360;
+        hmp /= 2;
+    }
+    const T = 1 - 0.17 * Math.cos((hmp - 30) * rad) + 0.24 * Math.cos(2 * hmp * rad)
+        + 0.32 * Math.cos((3 * hmp + 6) * rad) - 0.2 * Math.cos((4 * hmp - 63) * rad);
+    const dTheta = 30 * Math.exp(-(((hmp - 275) / 25) ** 2));
+    const Rc = 2 * Math.sqrt(Cmp ** 7 / (Cmp ** 7 + 25 ** 7));
+    const Sl = 1 + (0.015 * (Lmp - 50) ** 2) / Math.sqrt(20 + (Lmp - 50) ** 2);
+    const Sc = 1 + 0.045 * Cmp, Sh = 1 + 0.015 * Cmp * T;
+    const Rt = -Math.sin(2 * dTheta * rad) * Rc;
+    return Math.sqrt((dLp / Sl) ** 2 + (dCp / Sc) ** 2 + (dHp / Sh) ** 2
+        + Rt * (dCp / Sc) * (dHp / Sh));
 }
 
 // Relative luminance 0-1, sRGB weights without gamma.
@@ -67,7 +116,8 @@ function luminance(c) {
 
 // Above this a colour washes out against the white ice.
 const MAX_ICE_LUMINANCE = 0.75;
-const MIN_TEAM_DISTANCE = 90;
+// From the audit of all 528 team combinations: below 20 pairs read alike.
+const MIN_TEAM_DELTA_E = 20;
 
 function readable(c) {
     return luminance(c) <= MAX_ICE_LUMINANCE;
@@ -89,7 +139,7 @@ export function gameColors(awayId, homeId) {
     const awaySet = (teamColors[awayId] ?? [NEUTRAL]).filter(readable);
     for (const home of homeSet) {
         const away = awaySet.find(
-            (c) => rgbDistance(c, home) >= MIN_TEAM_DISTANCE);
+            (c) => deltaE2000(c, home) >= MIN_TEAM_DELTA_E);
         if (away !== undefined) {
             return new Map([[homeId, home], [awayId, away]]);
         }

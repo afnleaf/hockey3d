@@ -75,7 +75,6 @@ async fn setup_with(
     let dir = tempfile::tempdir().unwrap();
     let mut cfg = nhl_record_relay::Config {
         cache_dir: dir.path().into(),
-        allowed_origins: vec![ORIGIN.into(), "null".into()],
         web_base: upstream.clone(),
         stats_base: upstream.clone(),
         assets_base: upstream,
@@ -90,17 +89,17 @@ async fn setup_with(
 }
 
 #[tokio::test]
-async fn final_game_is_cached_and_cors_limited_to_origin() {
+async fn final_game_is_cached_and_cors_open_to_any_origin() {
     let (relay, hits, _d) = setup("OFF").await;
     let c = client();
     let url = format!("{relay}/v1/gamecenter/2026020224/play-by-play");
     let r = c.get(&url).header("Origin", ORIGIN).send().await.unwrap();
     assert_eq!(r.status(), 200);
-    assert_eq!(r.headers()["access-control-allow-origin"], ORIGIN);
+    assert_eq!(r.headers()["access-control-allow-origin"], "*");
     assert!(r.text().await.unwrap().contains("OFF"));
     let r = c.get(&url).header("Origin", "https://evil.example").send().await.unwrap();
-    assert_eq!(r.status(), 403);
-    assert!(r.headers().get("access-control-allow-origin").is_none());
+    assert_eq!(r.status(), 200);
+    assert_eq!(r.headers()["access-control-allow-origin"], "*");
     assert_eq!(hits.load(Ordering::SeqCst), 1);
 }
 
@@ -148,14 +147,14 @@ async fn upstream_failure_without_cache_is_502() {
 }
 
 #[tokio::test]
-async fn schedule_is_proxied_cached_and_cors_limited() {
+async fn schedule_is_proxied_and_cached() {
     let (relay, hits, _d) = setup("OFF").await;
     let c = client();
     let url = format!("{relay}/v1/schedule/2026-10-31");
     for _ in 0..2 {
         let r = c.get(&url).header("Origin", ORIGIN).send().await.unwrap();
         assert_eq!(r.status(), 200);
-        assert_eq!(r.headers()["access-control-allow-origin"], ORIGIN);
+        assert_eq!(r.headers()["access-control-allow-origin"], "*");
         assert!(r.text().await.unwrap().contains(r#""date":"2026-10-31""#));
     }
     assert_eq!(hits.load(Ordering::SeqCst), 1);
@@ -199,11 +198,11 @@ async fn file_origin_preflight_and_get_are_allowed() {
         .await
         .unwrap();
     assert!(r.status().is_success());
-    assert_eq!(r.headers()["access-control-allow-origin"], "null");
+    assert_eq!(r.headers()["access-control-allow-origin"], "*");
     assert_eq!(r.headers()["access-control-max-age"], "86400");
     let r = client().get(&url).header("Origin", "null").send().await.unwrap();
     assert_eq!(r.status(), 200);
-    assert_eq!(r.headers()["access-control-allow-origin"], "null");
+    assert_eq!(r.headers()["access-control-allow-origin"], "*");
 }
 
 #[tokio::test]
@@ -236,7 +235,7 @@ async fn logo_is_ungated_cached_and_cors_enabled() {
         assert_eq!(r.status(), 200, "{name}");
         assert_eq!(r.headers()["content-type"], "image/svg+xml");
         assert_eq!(r.headers()["content-security-policy"], "sandbox");
-        assert_eq!(r.headers()["access-control-allow-origin"], "null");
+        assert_eq!(r.headers()["access-control-allow-origin"], "*");
         assert_eq!(r.text().await.unwrap(), format!("<svg id=\"{name}\"/>"));
     }
     let again = reqwest::get(format!("{relay}/logo/TOR_dark.svg")).await.unwrap();
@@ -260,19 +259,6 @@ async fn logo_rejects_bad_names_and_bad_upstream_bodies() {
         assert_eq!(r.status(), 502, "{name}");
         assert!(!d.path().join(format!("logo_{name}")).exists());
     }
-}
-
-#[tokio::test]
-async fn foreign_origin_is_403_on_logos_too() {
-    let (relay, hits, _d) = setup("OFF").await;
-    let r = reqwest::Client::new()
-        .get(format!("{relay}/logo/TOR_dark.svg"))
-        .header("Origin", "https://evil.example")
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(r.status(), 403);
-    assert_eq!(hits.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
@@ -301,7 +287,7 @@ async fn oversized_upstream_body_is_502_and_not_cached() {
 }
 
 #[tokio::test]
-async fn public_mode_drops_index_keeps_null_origin() {
+async fn public_mode_drops_index() {
     let (relay, _h, d) = setup_with("OFF", |c| c.public = true).await;
     std::fs::write(d.path().join("index.html"), "<p>x</p>").unwrap();
     assert_eq!(reqwest::get(format!("{relay}/")).await.unwrap().status(), 404);
