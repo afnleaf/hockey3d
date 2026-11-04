@@ -1,6 +1,6 @@
 // HUD shell: top bar, event strip, filter popover and the shared panel
 // style. Other modules render into the exported slots.
-import { resetCamera } from "./scene.js";
+import { CAMERA_PRESETS, setCameraPreset, presetSnapshots } from "./scene.js";
 
 const NARROW = 600;
 
@@ -88,8 +88,29 @@ style.textContent = `
     width: max-content; max-width: calc(100% - 2 * var(--hud-gap));
     box-sizing: border-box;
   }
-  #filter-popover { z-index: 1; }
-  #filter-popover[hidden] { display: none; }
+  #filter-popover, #camera-popover { z-index: 1; }
+  #filter-popover[hidden], #camera-popover[hidden] { display: none; }
+  #camera-popover {
+    position: absolute; top: calc(var(--hud-gap) * 2 + var(--topbar-h));
+    right: var(--hud-gap); padding: 8px; box-sizing: border-box;
+    display: grid; grid-template-columns: repeat(2, 160px); gap: 8px;
+    max-width: calc(100% - 2 * var(--hud-gap));
+  }
+  #camera-popover button {
+    padding: 0; border: 2px solid transparent; border-radius: 4px;
+    background: none; color: inherit; font: inherit; font-size: 12px;
+    cursor: pointer; text-align: left;
+  }
+  #camera-popover button:hover, #camera-popover button:focus-visible {
+    border-color: var(--hud-dim); }
+  #camera-popover img { display: block; width: 100%; aspect-ratio: 16 / 9;
+    background: #333; }
+  #camera-popover span { display: block; padding: 2px 4px; }
+  @media (max-width: ${NARROW - 1}px) {
+    #camera-popover { grid-template-columns: repeat(2, minmax(0, 1fr));
+      left: var(--hud-gap);
+      top: calc(52px + var(--hud-gap) + var(--topbar-h)); }
+  }
 
   @media (max-width: ${NARROW - 1}px) {
     #strip { display: none; }
@@ -119,14 +140,36 @@ topbar.innerHTML = `
     <div class="status"><span class="period"></span>
       <span class="clock"></span></div>
     <div class="team home"></div>
-    <button class="hud-btn" id="reset-camera" title="Reset camera view"
-      aria-label="Reset camera view">&#128247;</button>
+    <button class="hud-btn" id="camera-toggle" title="Camera views (1-4)"
+      aria-label="Camera views" aria-expanded="false">&#128247;</button>
   </div>`;
 const teamSlots = [topbar.querySelector(".away"),
     topbar.querySelector(".home")];
 const periodEl = topbar.querySelector(".period");
 const clockEl = topbar.querySelector(".clock");
-topbar.querySelector("#reset-camera").addEventListener("click", resetCamera);
+
+const cameraPanel = document.createElement("div");
+cameraPanel.id = "camera-popover";
+cameraPanel.className = "hud-panel";
+cameraPanel.hidden = true;
+const cameraToggle = topbar.querySelector("#camera-toggle");
+const presetButtons = CAMERA_PRESETS.map((p, i) => {
+    const b = document.createElement("button");
+    b.innerHTML = `<img alt=""><span>${i + 1}. ${p.name}</span>`;
+    b.addEventListener("click", () => { setCameraPreset(i); setCameraOpen(false); });
+    return b;
+});
+cameraPanel.append(...presetButtons);
+
+function setCameraOpen(open) {
+    // Snapshots on each open so they show the current game's ice logo.
+    if (open) presetSnapshots().forEach((url, i) => {
+        presetButtons[i].querySelector("img").src = url;
+    });
+    cameraPanel.hidden = !open;
+    cameraToggle.setAttribute("aria-expanded", String(open));
+}
+cameraToggle.addEventListener("click", () => setCameraOpen(cameraPanel.hidden));
 
 // filters.js fills this popover
 export const filterPanel = document.createElement("div");
@@ -143,9 +186,15 @@ filterToggle.addEventListener("click", () => setFiltersOpen(filterPanel.hidden))
 document.addEventListener("pointerdown", (e) => {
     if (!filterPanel.hidden && !filterPanel.contains(e.target)
         && !filterToggle.contains(e.target)) setFiltersOpen(false);
+    if (!cameraPanel.hidden && !cameraPanel.contains(e.target)
+        && !cameraToggle.contains(e.target)) setCameraOpen(false);
 });
 document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") setFiltersOpen(false);
+    if (e.key === "Escape") { setFiltersOpen(false); setCameraOpen(false); return; }
+    const t = e.target;
+    if (t.isContentEditable || t.tagName === "INPUT" || e.metaKey || e.ctrlKey) return;
+    const i = Number(e.key) - 1;
+    if (CAMERA_PRESETS[i]) { setCameraPreset(i); e.preventDefault(); }
 });
 
 const strip = document.createElement("div");
@@ -162,7 +211,7 @@ export const keySection = strip.querySelector("#event-key");
 new ResizeObserver(() => hudContainer.style.setProperty("--topbar-h",
     `${topbar.offsetHeight}px`)).observe(topbar);
 
-hudContainer.append(topbar, filterPanel, strip);
+hudContainer.append(topbar, filterPanel, cameraPanel, strip);
 document.body.appendChild(hudContainer);
 
 // teams: [away, home] as { abbrev, color, logo }

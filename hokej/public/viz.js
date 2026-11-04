@@ -293,9 +293,10 @@ canvas.addEventListener("pointerleave", () => {
     if (!pinnedPlay) rinkTip.style.display = "none";
 });
 
-// A drag rotates the camera; only a near-still press counts as a click.
+// A drag moves the camera; only a near-still primary press counts as a click.
 let downAt = null;
 canvas.addEventListener("pointerdown", (e) => {
+    if (!e.isPrimary || e.button !== 0 || e.ctrlKey) { downAt = null; return; }
     downAt = { x: e.clientX, y: e.clientY };
 });
 canvas.addEventListener("pointerup", (e) => {
